@@ -252,12 +252,17 @@ class ExchangeManager {
             if (exchangeCredentials) {
                 const exchange = await this.openExchange(exchangeName, exchangeCredentials, symbol);
                 if (exchange) {
-                    await exchange.addSymbol(symbol);
-                    all.push(this.executeCommandSequence(exchange, symbol, actions)
-                        .catch((err) => {
-                            logger.error(`Command sequence terminated - ${err}`);
-                        })
-                        .finally(() => setTimeout(() => this.closeExchange(exchange), 500)));
+                    try {
+                        await exchange.addSymbol(symbol);
+                        all.push(this.executeCommandSequence(exchange, symbol, actions)
+                            .catch((err) => {
+                                logger.error(`Command sequence terminated - ${err}`);
+                            })
+                            .finally(() => setTimeout(() => this.closeExchange(exchange), 500)));
+                    } catch (err) {
+                        logger.error(`Error - ${err}`);
+                        setTimeout(() => this.closeExchange(exchange), 500);
+                    }
                 } else {
                     logger.error(`Exchange '${exchangeName}' is not supported`);
                 }
