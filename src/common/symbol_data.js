@@ -37,7 +37,7 @@ class SymbolData {
 
     pricePrecision(symbol) {
         const sd = this.find(symbol);
-        if (!sd || !sd.pricePrecision) {
+        if (!sd || sd.pricePrecision === undefined) {
             return 2;
         }
 
@@ -46,7 +46,7 @@ class SymbolData {
 
     assetPrecision(symbol) {
         const sd = this.find(symbol);
-        if (!sd || !sd.assetPrecision) {
+        if (!sd || sd.assetPrecision === undefined) {
             return 6;
         }
 
