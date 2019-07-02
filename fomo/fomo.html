@@ -1,14 +1,6 @@
 <!DOCTYPE html>
 <html>
 <head>
-
-<!--
-
-IMPORTANT - Change the URL in the JS code near the bottom of the file to
-contain the URL of your bot instance.
-
--->
-
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Fomo</title>
@@ -16,10 +8,22 @@ contain the URL of your bot instance.
     <!-- CSS Framework docs: https://bulma.io/documentation/ -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.2/css/bulma.min.css">
     <link rel="stylesheet" href="bulma-switch.min.css">
-
     <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+
+<!--
+
+IMPORTANT - Change the URL in the JS code near the bottom of the file to
+contain the URL of your bot instance.
+
+-->
+    <!-- Pick up the defaults from config.default.js -->
+    <script src="config.default.js"></script>
+
+    <!-- You should copy config.default.js and name it config.local.js and put your settings in here -->
+    <script src="config.local.js"></script>
 </head>
 <body>
+
 
 <div class="is-pulled-left">
     <a href="https://instabot42.github.io/">Instabot Trader Docs</a>
@@ -155,12 +159,6 @@ contain the URL of your bot instance.
                     <div class="control level-item">
                         <div class="select is-info">
                             <select id="position-instrument" class="exchange-picker">
-                                <option selected="selected" value="deribit:BTC-PERPETUAL">Deribit Perps</option>
-                                <option value="deribit:BTC-28JUN19">Deribit Jun19 Futures</option>
-                                <option value="deribit:BTC-27SEP19">Deribit Sep19 Futures</option>
-                                <option value="bitfinex:BTCUSD">Bitfinex BTCUSD Spot</option>
-                                <option value="bfxmargin:BTCUSD">Bitfinex BTCUSD Margin</option>
-                                <option value="coinbase:BTC-EUR">Coinbase Pro BTC-EUR Spot</option>
                             </select>
                         </div>
                     </div>
@@ -310,12 +308,6 @@ contain the URL of your bot instance.
                     <div class="control level-item">
                         <div class="select is-info">
                             <select id="fomo-instrument" class="exchange-picker">
-                                <option selected="selected" value="deribit:BTC-PERPETUAL">Deribit Perps</option>
-                                <option value="deribit:BTC-28JUN19">Deribit Jun19 Futures</option>
-                                <option value="deribit:BTC-27SEP19">Deribit Sep19 Futures</option>
-                                <option value="bitfinex:BTCUSD">Bitfinex BTCUSD Spot</option>
-                                <option value="bfxmargin:BTCUSD">Bitfinex BTCUSD Margin</option>
-                                <option value="coinbase:BTC-EUR">Coinbase Pro BTC-EUR Spot</option>
                             </select>
                         </div>
                     </div>
@@ -558,12 +550,6 @@ contain the URL of your bot instance.
                     <div class="control level-item">
                         <div class="select is-info">
                             <select id="fomo-instrument" class="exchange-picker">
-                                <option selected="selected" value="deribit:BTC-PERPETUAL">Deribit Perps</option>
-                                <option value="deribit:BTC-28JUN19">Deribit Jun19 Futures</option>
-                                <option value="deribit:BTC-27SEP19">Deribit Sep19 Futures</option>
-                                <option value="bitfinex:BTCUSD">Bitfinex BTCUSD Spot</option>
-                                <option value="bfxmargin:BTCUSD">Bitfinex BTCUSD Margin</option>
-                                <option value="coinbase:BTC-EUR">Coinbase Pro BTC-EUR Spot</option>
                             </select>
                         </div>
                     </div>
@@ -1062,9 +1048,16 @@ Change liveEndpoint below to contain the URL of you instance of Instabot Trader
 <script>
     $( document ).ready(function() {
 
-        // CHANGE THIS LINE HERE...
-        const liveEndpoint = "http://locahost:3000/trade";
+        const liveEndpoint = window.fomoConfig.endpoint;
         let endpoint = liveEndpoint;
+
+        // Build out the options in the exchange pickers
+        const options = window.fomoConfig.exchanges.map(function(exchange, i) {
+            const selected = 'selected="selected"';
+            return `<option ${ i===0 ? selected : '' } value="${exchange.value}">${exchange.name}</option>`;
+        });
+
+        $(".exchange-picker").html(options.join(' '));
 
         // Tab switcher
         $(".tabs li a").on('click', function(el) {
