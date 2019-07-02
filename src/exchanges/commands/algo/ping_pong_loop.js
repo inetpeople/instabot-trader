@@ -43,7 +43,7 @@ async function placeOppositeOrder(context, p, original) {
     // Need to place the 'pong' order on the other side of the book
     const side = original.side === 'buy' ? 'sell' : 'buy';
     const price = original.side === 'buy' ? original.price + p.pongDistance : original.price - p.pongDistance;
-    const amount = p.side === original.side ? p.pongAmount : p.pingAmount;
+    const amount = original.side === 'buy' ? p.pongAmount : p.pingAmount;
 
     return placeLimitOrder(context, side, price, amount, p.tag);
 }
@@ -138,7 +138,7 @@ module.exports = async (context, startingPings, startingPongs, p, autoBalance) =
             const firstPing = pings[0];
             const orderInfo = await ex.api.order(firstPing.order);
             if (orderInfo.is_filled) {
-                logger.results(`Ping Pong order: order filled - ${firstPing.side} ${firstPing.amount} for ${firstPing.price}`);
+                logger.results(`Ping Pong order: ping filled - ${firstPing.side} ${firstPing.amount} for ${firstPing.price}`);
                 pongs.push(await placeOppositeOrder(context, p, firstPing));
                 pongs = cleanOrderList(pongs);
                 pings.shift();
@@ -156,7 +156,7 @@ module.exports = async (context, startingPings, startingPongs, p, autoBalance) =
             const firstPong = pongs[0];
             const orderInfo = await ex.api.order(firstPong.order);
             if (orderInfo.is_filled) {
-                logger.results(`Ping Pong order: order filled - ${firstPong.side} ${firstPong.amount} for ${firstPong.price}`);
+                logger.results(`Ping Pong order: pong filled - ${firstPong.side} ${firstPong.amount} for ${firstPong.price}`);
                 pings.push(await placeOppositeOrder(context, p, firstPong));
                 pings = cleanOrderList(pings);
                 pongs.shift();
