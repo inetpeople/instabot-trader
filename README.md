@@ -13,13 +13,15 @@ exchanges on a single alert (long spot on Bitfinex and hedge with a short on Der
 It supports notifications to SMS, Telegram or Slack too, so you can use it as a super powerful
 alerting tool to keep you in the loop.
 
-Docs are at [http://instabot42.github.io/](http://instabot42.github.io/)
+Docs are at [https://instabot42.github.io/](https://instabot42.github.io/)
 
-Find me on [Whalepool.io](http://whalepool.io/) teamspeak
+Hosted version (with BitMEX support) at [https://alertatron.com/](https://alertatron.com/)
+
+Find me on [Whalepool.io](https://whalepool.io/) teamspeak
 
 ## Basic setup
 
-Really, go look at the proper docs at [http://instabot42.github.io/](http://instabot42.github.io/).
+Really, go look at the proper docs at [https://instabot42.github.io/](https://instabot42.github.io/).
 
 You'll need `node` and `npm` to use this.
 
