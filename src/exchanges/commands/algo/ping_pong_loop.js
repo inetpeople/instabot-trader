@@ -15,7 +15,7 @@ async function placeLimitOrder(context, side, price, amount, tag) {
         const { ex = {}, symbol = '', session = '' } = context;
 
         // Place the order
-        const order = await ex.api.limitOrder(symbol, amount, price, side, false);
+        const order = await ex.api.limitOrder(symbol, amount, price, side, true, false);
         ex.addToSession(session, tag, order);
 
         const now = new Date();

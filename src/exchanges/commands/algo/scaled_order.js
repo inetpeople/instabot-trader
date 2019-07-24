@@ -91,7 +91,7 @@ module.exports = async (context, args) => {
             // If there are no units we can place the order directly and save on API calls
             if (p.amount.units === '') {
                 // Place the order
-                const order = await ex.api.limitOrder(symbol, amounts[i], prices[i], p.side, false);
+                const order = await ex.api.limitOrder(symbol, amounts[i], prices[i], p.side, true, false);
                 ex.addToSession(session, p.tag, order);
                 const now = new Date();
                 logger.results(`Limit order placed at ${now.toTimeString()}. ${p.side} ${amounts[i]} at ${prices[i]}.`);

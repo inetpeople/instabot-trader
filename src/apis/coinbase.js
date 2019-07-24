@@ -102,16 +102,18 @@ class Coinbase extends ApiInterface {
      * @param amount
      * @param price
      * @param side
+     * @param postOnly
+     * @param _reduceOnly
      * @returns {*}
      */
-    limitOrder(symbol, amount, price, side) {
+    limitOrder(symbol, amount, price, side, postOnly, _reduceOnly) {
         const params = {
             type: 'limit',
             side,
             product_id: symbol,
             price: this.formatPrice(price),
             size: this.formatAmount(amount),
-            post_only: true,
+            post_only: postOnly,
         };
 
         return this.rateLimit().then(() => this.authClient.placeOrder(params));

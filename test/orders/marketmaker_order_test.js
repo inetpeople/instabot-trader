@@ -72,14 +72,14 @@ describe('Market Maker Orders', () => {
         ];
 
         const expectLimit = [
-            ['btcusd', 0.1, 3000, 'buy', false],
-            ['btcusd', 0.1, 2990, 'buy', false],
-            ['btcusd', 0.1, 2980, 'buy', false],
-            ['btcusd', 0.1, 2970, 'buy', false],
-            ['btcusd', 0.1, 3030, 'sell', false],
-            ['btcusd', 0.1, 3040, 'sell', false],
-            ['btcusd', 0.1, 3050, 'sell', false],
-            ['btcusd', 0.1, 3060, 'sell', false],
+            ['btcusd', 0.1, 3000, 'buy', true, false],
+            ['btcusd', 0.1, 2990, 'buy', true, false],
+            ['btcusd', 0.1, 2980, 'buy', true, false],
+            ['btcusd', 0.1, 2970, 'buy', true, false],
+            ['btcusd', 0.1, 3030, 'sell', true, false],
+            ['btcusd', 0.1, 3040, 'sell', true, false],
+            ['btcusd', 0.1, 3050, 'sell', true, false],
+            ['btcusd', 0.1, 3060, 'sell', true, false],
         ];
 
         const finished = sinon.fake();
@@ -132,13 +132,13 @@ describe('Market Maker Orders', () => {
 
         const expectLimit = [
             // 4 initial orders (from scaled order0
-            ['btcusd', 0.1, 3000, 'buy', false],
-            ['btcusd', 0.1, 2990, 'buy', false],
-            ['btcusd', 0.1, 2980, 'buy', false],
-            ['btcusd', 0.1, 2970, 'buy', false],
+            ['btcusd', 0.1, 3000, 'buy', true, false],
+            ['btcusd', 0.1, 2990, 'buy', true, false],
+            ['btcusd', 0.1, 2980, 'buy', true, false],
+            ['btcusd', 0.1, 2970, 'buy', true, false],
 
             // plus one extra, from shuffling the bottom order up closer to the price
-            ['btcusd', 0.1, 3010, 'buy', false],
+            ['btcusd', 0.1, 3010, 'buy', true, false],
         ];
 
         ticker.onCall(0).returns({ mid: '3025', bid: '3000', ask: '3040', last_price: '3010' });

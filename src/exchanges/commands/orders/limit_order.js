@@ -14,11 +14,17 @@ module.exports = async (context, args) => {
         amount: '0',
         tag: new Date().toISOString(),
         position: '',
+        postOnly: 'true',
+        reduceOnly: 'false',
     }, args);
 
     // show a little progress
     logger.progress(`LIMIT ORDER - ${ex.name}`);
     logger.progress(params);
+
+    // get the flags to actual bools
+    params.postOnly = params.postOnly.toLowerCase() === 'true';
+    params.reduceOnly = params.reduceOnly.toLowerCase() === 'true';
 
     // Validate the side
     if ((params.side !== 'buy') && (params.side !== 'sell')) {
@@ -47,7 +53,7 @@ module.exports = async (context, args) => {
     }
 
     // Place the order
-    const order = await ex.api.limitOrder(symbol, details.orderSize, orderPrice, side, details.isAllAvailable);
+    const order = await ex.api.limitOrder(symbol, details.orderSize, orderPrice, side, params.postOnly, params.reduceOnly);
     ex.addToSession(session, params.tag, order);
     const now = new Date();
     logger.results(`Limit order placed at ${now.toTimeString()}. ${side} ${details.orderSize} at ${orderPrice}.`);

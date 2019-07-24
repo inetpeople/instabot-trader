@@ -94,7 +94,7 @@ describe('limit Orders', async () => {
         mockWalletBalances(mock);
 
         // set up the limit order response
-        mock.expects('limitOrder').once().withArgs('BTCUSD', 1, 6440, 'buy', false).returns(Promise.resolve(expected));
+        mock.expects('limitOrder').once().withArgs('BTCUSD', 1, 6440, 'buy', true).returns(Promise.resolve(expected));
 
         // arguments
         const args = [

@@ -73,12 +73,12 @@ describe('Ping Pong Orders', () => {
             // endless: 'false',
 
         const expectLimit = [
-            ['btcusd', 2, 3000, 'buy', false],
-            ['btcusd', 2, 2950, 'buy', false],
-            ['btcusd', 2, 2900, 'buy', false],
-            ['btcusd', 2, 3050, 'sell', false],
-            ['btcusd', 2, 3000, 'sell', false],
-            ['btcusd', 2, 2950, 'sell', false],
+            ['btcusd', 2, 3000, 'buy', true, false],
+            ['btcusd', 2, 2950, 'buy', true, false],
+            ['btcusd', 2, 2900, 'buy', true, false],
+            ['btcusd', 2, 3050, 'sell', true, false],
+            ['btcusd', 2, 3000, 'sell', true, false],
+            ['btcusd', 2, 2950, 'sell', true, false],
         ];
 
 

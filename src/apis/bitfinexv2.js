@@ -419,10 +419,11 @@ class BitfinexApiv2 extends ApiInterface {
      * @param price
      * @param side
      * @param type
+     * @param postOnly
      * @param reduceOnly
      * @returns {Promise<*>}
      */
-    async newOrder(symbol, amount, price, side, type, reduceOnly = false) {
+    async newOrder(symbol, amount, price, side, type, postOnly = true, reduceOnly = false) {
         // Build new order
         const o = new Order({
             symbol: `t${symbol}`,
@@ -430,6 +431,10 @@ class BitfinexApiv2 extends ApiInterface {
             amount: side === 'buy' ? amount : -amount,
             type,
         }, this.ws);
+
+        if (postOnly) {
+            o.setPostOnly(true);
+        }
 
         if (reduceOnly) {
             o.setReduceOnly(true);
@@ -445,11 +450,14 @@ class BitfinexApiv2 extends ApiInterface {
      * @param amount
      * @param price
      * @param side
-     * @param isEverything
+     * @param postOnly
+     * @param reduceOnly
      * @returns {*}
      */
-    async limitOrder(symbol, amount, price, side, _isEverything) {
-        return this.newOrder(symbol, amount, price, side, this.isMargin ? Order.type.LIMIT : Order.type.EXCHANGE_LIMIT);
+    async limitOrder(symbol, amount, price, side, postOnly, reduceOnly) {
+        // reduce only is only supported on Margin
+        const reduce = this.isMargin && reduceOnly;
+        return this.newOrder(symbol, amount, price, side, this.isMargin ? Order.type.LIMIT : Order.type.EXCHANGE_LIMIT, postOnly, reduce);
     }
 
     /**
@@ -460,7 +468,7 @@ class BitfinexApiv2 extends ApiInterface {
      * @param isEverything
      */
     async marketOrder(symbol, amount, side, _isEverything) {
-        return this.newOrder(symbol, amount, 0, side, this.isMargin ? Order.type.MARKET : Order.type.EXCHANGE_MARKET);
+        return this.newOrder(symbol, amount, 0, side, this.isMargin ? Order.type.MARKET : Order.type.EXCHANGE_MARKET, false, false);
     }
 
     /**
@@ -473,7 +481,7 @@ class BitfinexApiv2 extends ApiInterface {
      * @returns {Promise<void>}
      */
     async stopOrder(symbol, amount, price, side, _trigger) {
-        return this.newOrder(symbol, amount, price, side, this.isMargin ? Order.type.STOP : Order.type.EXCHANGE_STOP, this.isMargin);
+        return this.newOrder(symbol, amount, price, side, this.isMargin ? Order.type.STOP : Order.type.EXCHANGE_STOP, false, this.isMargin);
     }
 
     /**

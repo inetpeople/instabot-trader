@@ -60,10 +60,11 @@ class ApiInterface {
      * @param amount
      * @param price
      * @param side
-     * @param isEverything
+     * @param postOnly
+     * @param reduceOnly
      * @returns {*}
      */
-    limitOrder(symbol, amount, price, side, isEverything) {
+    limitOrder(symbol, amount, price, side, postOnly, reduceOnly) {
         return Promise.reject(new Error('Not implemented'));
     }
 

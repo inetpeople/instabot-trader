@@ -246,16 +246,19 @@ class DeribitApi extends ApiInterface {
      * @param amount
      * @param price
      * @param side
+     * @param postOnly
+     * @param reduceOnly
      * @returns {*}
      */
-    limitOrder(symbol, amount, price, side/* , isEverything */) {
+    limitOrder(symbol, amount, price, side, postOnly, reduceOnly) {
         const params = {
             instrument: symbol.toUpperCase(),
             type: 'limit',
             quantity: String(util.roundDown(amount, 0)),
             price: String(util.round(price * 2, 0) / 2),
             time_in_force: 'good_till_cancel',
-            post_only: true,
+            postOnly,
+            reduceOnly,
         };
 
         return this.makeAuthRequest(`/api/v1/private/${side}`, params)
