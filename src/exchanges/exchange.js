@@ -8,6 +8,7 @@ const scaledOrder = require('./commands/algo/scaled_order');
 const twapOrder = require('./commands/algo/twap_order');
 const pingPongOrder = require('./commands/algo/ping_pong');
 const marketMakerOrder = require('./commands/algo/market_maker');
+const aggressiveEntryOrder= require('./commands/algo/aggressive_entry');
 
 const limitOrder = require('./commands/orders/limit_order');
 const marketOrder = require('./commands/orders/market_order');
@@ -53,6 +54,7 @@ class Exchange {
 
         this.commands = {
             // Algorithmic Orders
+            aggressiveEntryOrder,
             icebergOrder,
             scaledOrder,
             twapOrder,
@@ -74,7 +76,7 @@ class Exchange {
         };
 
         this.commandWhiteList = [
-            'icebergOrder', 'scaledOrder', 'twapOrder', 'pingPongOrder', 'marketMakerOrder',
+            'aggressiveEntryOrder', 'icebergOrder', 'scaledOrder', 'twapOrder', 'pingPongOrder', 'marketMakerOrder',
             'steppedMarketOrder', 'accDisOrder',
             'limitOrder', 'marketOrder', 'stopMarketOrder',
             'cancelOrders', 'wait', 'notify', 'balance'];
