@@ -41,11 +41,11 @@ class DeribitApi extends ApiInterface {
             interval: retryCount => 15000 + (5000 * retryCount),
             errorFilter: err => (err === 503 || err === 502 || err === 429),
         }, (next) => {
-            const t0 = Date.now();
+            // const t0 = Date.now();
             request(requestOptions, (error, response, body) => {
-                const t1 = Date.now();
-                const duration = (t1 - t0).toFixed(3);
-                logger.debug(`${requestOptions.method} to ${requestOptions.url} took ${duration}ms`);
+                // const t1 = Date.now();
+                // const duration = (t1 - t0).toFixed(3);
+                // logger.debug(`${requestOptions.method} to ${requestOptions.url} took ${duration}ms`);
 
                 if (error) {
                     logger.error('Error calling Deribit API');

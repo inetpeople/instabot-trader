@@ -99,12 +99,10 @@ class Exchange {
 
     /**
      * Determine if this exchange is a match of the details given
-     * @param name
      * @param credentials
      * @returns {boolean}
      */
-    matches(name, credentials) {
-        if (name !== this.name) return false;
+    matches(credentials) {
         return JSON.stringify(credentials) === JSON.stringify(this.credentials);
     }
 

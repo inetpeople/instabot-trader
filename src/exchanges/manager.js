@@ -24,12 +24,11 @@ class ExchangeManager {
 
     /**
      * Helper to find an exchange that we already have opened
-     * @param name
      * @param credentials
      * @returns {Exchange | undefined}
      */
-    findOpened(name, credentials) {
-        return this.opened.find(el => el.matches(name, credentials));
+    findOpened(credentials) {
+        return this.opened.find(el => el.matches(credentials));
     }
 
     /**
@@ -40,7 +39,7 @@ class ExchangeManager {
      */
     async openExchange(name, credentials, symbol) {
         // Search the open exchanges to see if we have a match
-        const exchange = this.findOpened(name, credentials);
+        const exchange = this.findOpened(credentials);
 
         // If we found it, return it
         if (exchange) {
@@ -48,9 +47,8 @@ class ExchangeManager {
             return exchange;
         }
 
-        // no match, so try and create a new instance with the details
-        const exchangeName = credentials.exchange || name;
-        const match = this.exchanges.find(el => el.name === exchangeName);
+        // Find the exchange API that matches these credentials
+        const match = this.exchanges.find(el => el.name === credentials.exchange);
         if (!match) return null;
 
         // Create a new instance of the exchange with the credentials given
@@ -79,7 +77,7 @@ class ExchangeManager {
     async closeExchange(exchange) {
         if (!exchange) { return; }
 
-        const ex = this.findOpened(exchange.name, exchange.credentials);
+        const ex = this.findOpened(exchange.credentials);
         if (!ex) { return; }
 
         if (exchange.removeReference() <= 0) {
