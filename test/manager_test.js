@@ -20,7 +20,7 @@ describe('Exchange Manager tests', () => {
     it('can create an exchange when asked', async () => {
         class DummyExchange { init() {} validate() { return 'valid'; }}
         const manager = new ExchangeManager([{ name: 'test', class: DummyExchange }]);
-        const ex = await manager.openExchange('test', {});
+        const ex = await manager.openExchange('test', { exchange: 'test' });
         assert.equal(ex.validate(), 'valid');
     });
 
@@ -40,7 +40,7 @@ describe('Exchange Manager tests', () => {
 
     it('can close exchanges that do exist', async () => {
         const manager = new ExchangeManager([{ name: 'test', class: Exchange }]);
-        const ex = await manager.openExchange('test', {});
+        const ex = await manager.openExchange('test', { exchange: 'test' });
         assert.lengthOf(manager.opened, 1);
         await manager.closeExchange(ex);
         assert.lengthOf(manager.opened, 0);
