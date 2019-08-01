@@ -19,7 +19,7 @@ class Deribit extends Exchange {
         this.name = 'deribit';
 
         this.minPollingDelay = 0;
-        this.maxPollingDelay = 10;
+        this.maxPollingDelay = 4;
 
         // start up any sockets or create API handlers here.
         this.api = new DeribitApi(credentials.key, credentials.secret);

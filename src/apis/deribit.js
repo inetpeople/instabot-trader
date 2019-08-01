@@ -352,7 +352,7 @@ class DeribitApi extends ApiInterface {
                 remaining: o.quantity - o.filledQuantity,
                 executed: o.filledQuantity,
                 is_filled: o.quantity === o.filledQuantity,
-                is_open: o.state === 'open',
+                is_open: o.state === 'open' || (o.state === 'untriggered' && o.type === 'stop_market'),
             }));
     }
 

@@ -98,21 +98,25 @@ module.exports = async (context, args) => {
         } else {
             // There is already an open order, so see if it's filled yet
             const orderInfo = await ex.api.order(activeOrder);
-            if (orderInfo.is_filled) {
-                logger.progress('Aggressive Entry: filled');
-                amountLeft -= orderInfo.executed;
-                activeOrder = null;
-                waitTime = ex.minPollingDelay;
-            } else if (!orderInfo.is_open) {
-                logger.progress('Aggressive Entry order: cancelled - aborting entire order');
-                return Promise.resolve({});
-            } else if (activePrice !== currentPrice) {
-                logger.progress('Aggressive Entry order: No longer at top of book - moving');
-                await ex.api.cancelOrders([activeOrder]);
-                amountLeft -= orderInfo.executed;
-                activeOrder = null;
-                activePrice = 0;
-                waitTime = ex.minPollingDelay;
+            if (orderInfo !== null) {
+                if (orderInfo.is_filled) {
+                    logger.progress('Aggressive Entry: filled');
+                    amountLeft -= orderInfo.executed;
+                    activeOrder = null;
+                    waitTime = ex.minPollingDelay;
+                } else if (!orderInfo.is_open) {
+                    logger.progress('Aggressive Entry order: cancelled - aborting entire order');
+                    return Promise.resolve({});
+                } else if (activePrice !== currentPrice) {
+                    logger.progress('Aggressive Entry order: No longer at top of book - moving');
+                    await ex.api.cancelOrders([activeOrder]);
+                    amountLeft -= orderInfo.executed;
+                    activeOrder = null;
+                    activePrice = 0;
+                    waitTime = ex.minPollingDelay;
+                }
+            } else {
+                logger.progress('Aggressive Entry order: waiting for order status');
             }
         }
 

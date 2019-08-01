@@ -8,7 +8,8 @@ const scaledOrder = require('./commands/algo/scaled_order');
 const twapOrder = require('./commands/algo/twap_order');
 const pingPongOrder = require('./commands/algo/ping_pong');
 const marketMakerOrder = require('./commands/algo/market_maker');
-const aggressiveEntryOrder= require('./commands/algo/aggressive_entry');
+const aggressiveEntryOrder = require('./commands/algo/aggressive_entry');
+const stopOrTakeProfitOrder = require('./commands/algo/stop_take_profit_order');
 
 const limitOrder = require('./commands/orders/limit_order');
 const marketOrder = require('./commands/orders/market_order');
@@ -55,6 +56,7 @@ class Exchange {
         this.commands = {
             // Algorithmic Orders
             aggressiveEntryOrder,
+            stopOrTakeProfitOrder,
             icebergOrder,
             scaledOrder,
             twapOrder,
@@ -76,7 +78,8 @@ class Exchange {
         };
 
         this.commandWhiteList = [
-            'aggressiveEntryOrder', 'icebergOrder', 'scaledOrder', 'twapOrder', 'pingPongOrder', 'marketMakerOrder',
+            'stopOrTakeProfitOrder', 'aggressiveEntryOrder',
+            'icebergOrder', 'scaledOrder', 'twapOrder', 'pingPongOrder', 'marketMakerOrder',
             'steppedMarketOrder', 'accDisOrder',
             'limitOrder', 'marketOrder', 'stopMarketOrder',
             'cancelOrders', 'wait', 'notify', 'balance'];
@@ -201,6 +204,10 @@ class Exchange {
      */
     isAlgoOrderCancelled(id) {
         const order = this.algorithicOrders.find(item => item.id === id);
+        if (!order) {
+            return true;
+        }
+
         return order.cancelled;
     }
 
