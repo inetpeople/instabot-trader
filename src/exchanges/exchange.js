@@ -19,6 +19,8 @@ const cancelOrders = require('./commands/cancel_orders');
 const notify = require('./commands/notify');
 const balance = require('./commands/balance');
 const wait = require('./commands/wait');
+const continueCmd = require('./commands/continue');
+const stopCmd = require('./commands/stop');
 
 // and some support functions
 const scaledOrderSize = require('./support/scaled_order_size');
@@ -75,10 +77,12 @@ class Exchange {
             wait,
             notify,
             balance,
+            continue: continueCmd,
+            stop: stopCmd,
         };
 
         this.commandWhiteList = [
-            'stopOrTakeProfitOrder', 'aggressiveEntryOrder',
+            'continue', 'stop', 'stopOrTakeProfitOrder', 'aggressiveEntryOrder',
             'icebergOrder', 'scaledOrder', 'twapOrder', 'pingPongOrder', 'marketMakerOrder',
             'steppedMarketOrder', 'accDisOrder',
             'limitOrder', 'marketOrder', 'stopMarketOrder',
@@ -554,6 +558,20 @@ class Exchange {
         const change = this.roundAsset(symbol, target - total);
 
         return { side: change < 0 ? 'sell' : 'buy', amount: { value: Math.abs(change), units: '' } };
+    }
+
+    /**
+     * Find out the position size
+     * @param symbol
+     * @returns {Promise<*>}
+     */
+    async positionSize(symbol) {
+        const adjustToZero = await this.positionToAmount(symbol, '0', '', '');
+        if (adjustToZero.side === 'buy') {
+            return -adjustToZero.amount.value;
+        }
+
+        return adjustToZero.amount.value;
     }
 
     /**

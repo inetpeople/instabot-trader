@@ -8,6 +8,7 @@
     "express": "^4.16.2",
     "gdax": "^0.8.0",
     "get-stdin": "^6.0.0",
+    "moment": "^2.24.0",
     "request": "^2.88.0",
     "slack-node": "^0.1.8",
     "telegraf": "^3.24.1",

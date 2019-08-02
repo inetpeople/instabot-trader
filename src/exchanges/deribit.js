@@ -135,6 +135,20 @@ class Deribit extends Exchange {
             return { side: change < 0 ? 'sell' : 'buy', amount: { value: Math.abs(change), units: '' } };
         });
     }
+
+    /**
+     * Find out the position size
+     * @param symbol
+     * @returns {Promise<*>}
+     */
+    async positionSize(symbol) {
+        // Find current position.
+        return this.api.positions().then((openPositions) => {
+            // Filter the results down to just hte symbol we are using
+            logger.dim(openPositions);
+            return openPositions.reduce((size, item) => ((item.instrument.toUpperCase() !== symbol.toUpperCase()) ? size : item.size), 0);
+        });
+    }
 }
 
 module.exports = Deribit;

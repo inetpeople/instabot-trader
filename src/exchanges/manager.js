@@ -182,8 +182,12 @@ class ExchangeManager {
                 this.executeCommand(exchange, symbol, action.name, action.params, session)
                     .then(() => next())
                     .catch((err) => {
+                        if (err instanceof Error && err.message === 'Abort Sequence') {
+                            logger.error(`${action.name} FAILED. Stopping all command execution`);
+                            return next(err);
+                        }
                         logger.error(`${action.name} FAILED: ${err}`);
-                        next();
+                        return next();
                     });
             }, err => ((err) ? reject(err) : resolve()));
         });
