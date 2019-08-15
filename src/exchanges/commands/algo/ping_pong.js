@@ -47,6 +47,7 @@ module.exports = async (context, args) => {
     if ((p.pingAmount === 0) && (p.pongAmount === 0)) {
         const modifiedPosition = await ex.positionToAmount(symbol, p.position, p.side, p.amount);
         p.pingAmount = p.pongAmount = ex.roundAsset(symbol, modifiedPosition.amount.value / p.orderCount);
+        p.side = modifiedPosition.side;
     }
 
     p.amount = String(ex.roundAsset(symbol, p.pingAmount * p.orderCount));
