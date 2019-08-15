@@ -2,7 +2,7 @@ const uuid = require('uuid/v4');
 const logger = require('../../../common/logger').logger;
 
 /**
- * Place an iceberg algorithmic order
+ * Place an aggressive entry algorithmic order
  */
 module.exports = async (context, args) => {
     const { ex = {}, symbol = '', session = '' } = context;
@@ -46,15 +46,17 @@ module.exports = async (context, args) => {
     }
 
     const id = uuid();
-    const isBuy = (p.side.toLowerCase() === 'buy');
+    const isBuy = (side === 'buy');
+
+    logger.results(`Aggressive entry order adjusted to side: ${side}, amount: ${details.orderSize}.`);
 
     // Log the algo order, so it can be cancelled
-    ex.startAlgoOrder(id, p.side, session, p.tag);
+    ex.startAlgoOrder(id, side, session, p.tag);
 
     // Start off we no active order and the full amount still to fill
     let activeOrder = null;
     let activePrice = 0;
-    let amountLeft = p.amount;
+    let amountLeft = details.orderSize;
     let waitTime = ex.minPollingDelay;
 
     // The loop until there is nothing left to order
@@ -85,7 +87,7 @@ module.exports = async (context, args) => {
 
             // place a new limit order
             const orderParams = [
-                { name: 'side', value: p.side, index: 0 },
+                { name: 'side', value: side, index: 0 },
                 { name: 'amount', value: `${amount}`, index: 1 },
                 { name: 'offset', value: `@${currentPrice}`, index: 2 },
                 { name: 'postOnly', value: 'true', index: 3 },
@@ -94,7 +96,7 @@ module.exports = async (context, args) => {
 
             activeOrder = order.order;
             activePrice = currentPrice;
-            waitTime = ex.minPollingDelay;
+            waitTime = ex.minPollingDelay + 2;
         } else {
             // There is already an open order, so see if it's filled yet
             const orderInfo = await ex.api.order(activeOrder);
