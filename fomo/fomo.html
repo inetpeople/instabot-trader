@@ -12,9 +12,8 @@
 
 <!--
 
-IMPORTANT - Change the URL in the JS code near the bottom of the file to
-contain the URL of your bot instance.
-
+IMPORTANT - Copy config.default.js to config.local.js then update config.local.js
+            Add your exchanges and symbols you'd like to see in the exchange dropdown
 -->
     <!-- Pick up the defaults from config.default.js -->
     <script src="config.default.js"></script>
@@ -172,7 +171,7 @@ contain the URL of your bot instance.
                                     Enter a position
                                 </p>
                                 <p class="subtitle">
-                                    As cheaply as possible.
+                                    As cheaply as possible with a chain of scaled orders.
                                 </p>
                                 <div class="content">
                                     <form>
@@ -201,7 +200,7 @@ contain the URL of your bot instance.
                                     Massage Position
                                 </p>
                                 <p class="subtitle">
-                                    Add and remove from existing position
+                                    Add and remove using limit orders
                                 </p>
                                 <div class="content">
                                     <form>
@@ -209,9 +208,16 @@ contain the URL of your bot instance.
                                         <input type="hidden" name="instrument" value="" class="f-instrument">
 
                                         <div class="field">
-                                            <label class="label">Amount (in contracts)</label>
+                                            <label class="label">Amount</label>
                                             <div class="control">
                                                 <input name="amount" class="input" type="text" value="500">
+                                            </div>
+                                        </div>
+
+                                        <div class="field">
+                                            <label class="label">Offset</label>
+                                            <div class="control">
+                                                <input name="offset" class="input" type="text" value="1">
                                             </div>
                                         </div>
 
@@ -294,7 +300,35 @@ contain the URL of your bot instance.
                             </div>
                         </div>
                     </div>
-                    <div class="column"></div>
+                    <div class="column">
+                        <div class="card">
+                            <div class="card-content">
+                                <p class="title">
+                                    Aggressive Entry
+                                </p>
+                                <p class="subtitle">
+                                    Limit order into position, chasing the book
+                                </p>
+                                <div class="content">
+                                    <form>
+                                        <input type="hidden" name="exchange" value="" class="f-exchange">
+                                        <input type="hidden" name="instrument" value="" class="f-instrument">
+
+                                        <div class="field">
+                                            <label class="label">Amount</label>
+                                            <div class="control">
+                                                <input name="amount" class="input" type="text" value="500">
+                                            </div>
+                                        </div>
+
+                                        <button class="trigger-action button is-medium is-success" data-action="aggressive-buy">Buy</button>
+                                        &nbsp;
+                                        <button class="trigger-action button is-medium is-danger" data-action="aggressive-sell">Sell</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -694,6 +728,14 @@ contain the URL of your bot instance.
             <div class="is-hidden" id="reports-content">
                 <h2 class="title is-2 has-text-centered">Alerts, Balances and Reports</h2>
                 <h4 class="subtitle is-4 has-text-centered">Across all exchanges</h4>
+                <div class="field level">
+                    <div class="control level-item">
+                        <div class="select is-info">
+                            <select id="fomo-instrument" class="exchange-picker">
+                            </select>
+                        </div>
+                    </div>
+                </div>
 
                 <div class="columns">
 
@@ -701,50 +743,21 @@ contain the URL of your bot instance.
                         <div class="card">
                             <div class="card-content">
                                 <p class="title">
-                                    Deribit
+                                    Balance
                                 </p>
                                 <p class="subtitle">
-                                    BTC-PERPETUAL
+                                    and position PnL
                                 </p>
-                                <div class="content has-text-centered">
-                                    <button class="trigger-action button is-medium is-info" data-action="fomo-deribit-balance">Deribit Balance</button>
-                                </div>
+                                <form>
+                                    <input type="hidden" name="exchange" value="" class="f-exchange">
+                                    <input type="hidden" name="instrument" value="" class="f-instrument">
+                                    <div class="content has-text-centered">
+                                        <button class="trigger-action button is-medium is-info" data-action="fomo-deribit-balance">Balance</button>
+                                    </div>
+                                </form>
                             </div>
                         </div>
                     </div>
-
-                    <div class="column">
-                        <div class="card">
-                            <div class="card-content">
-                                <p class="title">
-                                    Coinbase Pro
-                                </p>
-                                <p class="subtitle">
-                                    BTC-EUR
-                                </p>
-                                <div class="content has-text-centered">
-                                    <button class="trigger-action button is-medium is-info" data-action="fomo-coinbase-balance">Coinbase Balance</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="column">
-                        <div class="card">
-                            <div class="card-content">
-                                <p class="title">
-                                    Bitfinex
-                                </p>
-                                <p class="subtitle">
-                                    BTCUSD
-                                </p>
-                                <div class="content has-text-centered">
-                                    <button class="trigger-action button is-medium is-info" data-action="fomo-bitfinex-balance">Bitfinex Balance</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                 </div>
             </div>
 
@@ -769,9 +782,6 @@ contain the URL of your bot instance.
                                 <div class="content">
                                     <textarea id="manual-command-text" class="textarea" placeholder="10 lines of textarea" rows="10">
 bitfinex(BTCUSD) {
-    wait(5s);
-}
-bfxmargin(BTCUSD) {
     wait(5s);
 }
                                     </textarea>
@@ -814,76 +824,80 @@ bfxmargin(BTCUSD) {
     -->
 
     <!--  Entering a long position -->
-    <div id="deribit-std-long">
-        Going {{position}} long on {{instrument}}
-        {{exchange}}({{instrument}}) {
-            scaledOrder(from=0, to=25, orderCount=25, position={{position}}, tag=firstRound);
+<div id="deribit-std-long">
+Going {{position}} long on {{instrument}}
+{{exchange}}({{instrument}}) {
+    scaledOrder(from=0, to=25, orderCount=25, position={{position}}, tag=firstRound);
 
-            wait(30m);
-            cancelOrders(tagged, firstRound); wait(5s);
-            scaledOrder(from=0, to=15, orderCount=25, position={{position}}, tag=secondRound);
+    wait(30m);
+    cancelOrders(tagged, firstRound); wait(5s);
+    scaledOrder(from=0, to=15, orderCount=25, position={{position}}, tag=secondRound);
 
-            wait(30m);
-            cancelOrders(tagged, secondRound); wait(5s);
-            marketOrder(position={{position}});
+    wait(30m);
+    cancelOrders(tagged, secondRound); wait(5s);
+    marketOrder(position={{position}});
 
-            wait(5s);
-            balance();
-        }
-    </div>
+    wait(5s);
+    balance();
+}
+</div>
 
     <!--  Entering a Short position -->
-    <div id="deribit-std-short">
-        Going {{position}} Short on {{instrument}}
-        {{exchange}}({{instrument}}) {
-            scaledOrder(from=0, to=25, orderCount=25, position=-{{position}}, tag=firstRound);
+<div id="deribit-std-short">
+Going {{position}} Short on {{instrument}}
+{{exchange}}({{instrument}}) {
+    scaledOrder(from=0, to=25, orderCount=25, position=-{{position}}, tag=firstRound);
 
-            wait(30m);
-            cancelOrders(tagged, firstRound); wait(5s);
-            scaledOrder(from=0, to=15, orderCount=25, position=-{{position}}, tag=secondRound);
+    wait(30m);
+    cancelOrders(tagged, firstRound); wait(5s);
+    scaledOrder(from=0, to=15, orderCount=25, position=-{{position}}, tag=secondRound);
 
-            wait(30m);
-            cancelOrders(tagged, secondRound); wait(5s);
-            marketOrder(position=-{{position}});
+    wait(30m);
+    cancelOrders(tagged, secondRound); wait(5s);
+    marketOrder(position=-{{position}});
 
-            wait(5s);
-            balance();
-        }
-    </div>
+    wait(5s);
+    balance();
+}
+</div>
 
 
-    <!--  Add to position -->
-    <div id="deribit-massage-add">
-        Adding to position {{amount}} on {{instrument}}
-        {{exchange}}({{instrument}}) {
-            limitOrder(side=buy, amount={{amount}}, offset=1);
-        }
-    </div>
+<!--  Add to position -->
+<div id="deribit-massage-add">
+Adding to position by {{amount}}
+{{exchange}}({{instrument}}) { limitOrder(side=buy, amount={{amount}}, offset={{offset}}); }
+</div>
 
-    <!--  reduce position -->
-    <div id="deribit-massage-reduce">
-        Reducing Position {{amount}} on {{instrument}}.
-        {{exchange}}({{instrument}}) {
-            limitOrder(side=sell, amount={{amount}}, offset=1);
-        }
-    </div>
+<!--  reduce position -->
+<div id="deribit-massage-reduce">
+Reducing Position by {{amount}}
+{{exchange}}({{instrument}}) { limitOrder(side=sell, amount={{amount}}, offset={{offset}}); }
+</div>
+
+<!--  Aggressive Entry Buy -->
+<div id="aggressive-buy">
+    Aggressive Buy {{amount}}
+    {{exchange}}({{instrument}}) { aggressiveEntryOrder(side=buy, amount={{amount}}); }
+</div>
+
+<!--  Aggressive Entry Sell -->
+<div id="aggressive-sell">
+    Aggressive Sell {{amount}}
+    {{exchange}}({{instrument}}) { aggressiveEntryOrder(side=sell, amount={{amount}}); }
+</div>
 
 
     <!-- Iceberg Buy -->
-    <div id="iceberg-buy">
-        Placing Iceberg to buy {{totalAmount}} below {{limitPrice}} on {{instrument}}.
-        {{exchange}}({{instrument}}) {
-            icebergOrder(side=buy, totalAmount={{totalAmount}}, averageAmount={{averageAmount}}, variance={{variance}}, limitPrice={{limitPrice}}, timeLimit={{timeLimit}});
-        }
-    </div>
+<div id="iceberg-buy">
+Placing Iceberg to buy {{totalAmount}} below {{limitPrice}} on {{instrument}}.
+{{exchange}}({{instrument}}) { icebergOrder(side=buy, totalAmount={{totalAmount}}, averageAmount={{averageAmount}}, variance={{variance}}, limitPrice={{limitPrice}}, timeLimit={{timeLimit}}); }
+</div>
 
     <!-- Iceberg Sell -->
-    <div id="iceberg-sell">
-        Placing Iceberg to sell {{totalAmount}} above {{limitPrice}} on {{instrument}}.
-        {{exchange}}({{instrument}}) {
-            icebergOrder(side=sell, totalAmount={{totalAmount}}, averageAmount={{averageAmount}}, variance={{variance}}, limitPrice={{limitPrice}}, timeLimit={{timeLimit}});
-        }
-    </div>
+<div id="iceberg-sell">
+Placing Iceberg to sell {{totalAmount}} above {{limitPrice}} on {{instrument}}.
+{{exchange}}({{instrument}}) { icebergOrder(side=sell, totalAmount={{totalAmount}}, averageAmount={{averageAmount}}, variance={{variance}}, limitPrice={{limitPrice}}, timeLimit={{timeLimit}}); }
+</div>
 
 
     <!--
@@ -894,96 +908,75 @@ bfxmargin(BTCUSD) {
     -->
 
     <!-- Short -->
-    <div id="fomo-deribit-short">
-        FOMO Short to position of -{{amount}}
-        {{exchange}}({{instrument}}) {
-            marketOrder(position=-{{amount}});
-        }
-    </div>
+<div id="fomo-deribit-short">
+FOMO Short to position of -{{amount}}
+{{exchange}}({{instrument}}) { marketOrder(position=-{{amount}}); }
+</div>
 
     <!-- Long -->
-    <div id="fomo-deribit-long">
-        FOMO Long to position of {{amount}}
-        {{exchange}}({{instrument}}) {
-            marketOrder(position={{amount}});
-        }
-    </div>
+<div id="fomo-deribit-long">
+FOMO Long to position of {{amount}}
+{{exchange}}({{instrument}}) { marketOrder(position={{amount}}); }
+</div>
 
     <!-- Flat -->
-    <div id="fomo-deribit-flat">
-        Close open FOMO positions
-        {{exchange}}({{instrument}}) {
-            marketOrder(position=0);
-        }
-    </div>
+<div id="fomo-deribit-flat">
+Close open FOMO positions
+{{exchange}}({{instrument}}) { marketOrder(position=0); }
+</div>
 
 
     <!-- FOMO Close All-->
-    <div id="fomo-deribit-exit-all">
-        FOMO Exit all open positions and cancel all orders
-        {{exchange}}({{instrument}}) {
-            cancelOrders(all);
-            marketOrder(position=0);
-        }
-    </div>
+<div id="fomo-deribit-exit-all">
+FOMO Exit all open positions and cancel all orders
+{{exchange}}({{instrument}}) {
+    cancelOrders(all);
+    marketOrder(position=0);
+}
+</div>
 
     <!-- FOMO Close All-->
-    <div id="cancel-all">
-        Cancel all open orders
-        {{exchange}}({{instrument}}) {
-            cancelOrders(all);
-        }
-    </div>
-
+<div id="cancel-all">
+Cancel all open orders
+{{exchange}}({{instrument}}) { cancelOrders(all); }
+</div>
 
 
 
     <!-- FOMO add to long position -->
-    <div id="fomo-deribit-add-long">
-        FOMO buy {{amount}} contracts
-        {{exchange}}({{instrument}}) {
-            marketOrder(side=buy, amount={{amount}});
-        }
-    </div>
+<div id="fomo-deribit-add-long">
+FOMO buy
+{{exchange}}({{instrument}}) { marketOrder(side=buy, amount={{amount}}); }
+</div>
 
     <!-- FOMO add to short -->
-    <div id="fomo-deribit-add-short">
-        FOMO sell {{amount}} contracts
-        {{exchange}}({{instrument}}) {
-            marketOrder(side=sell, amount={{amount}});
-        }
-    </div>
+<div id="fomo-deribit-add-short">
+FOMO sell
+{{exchange}}({{instrument}}) { marketOrder(side=sell, amount={{amount}}); }
+</div>
 
     <!-- FOMO Scaled Order Buy -->
-    <div id="fomo-scaled-order-buy">
-        FOMO with a Scaled order
-        {{exchange}}({{instrument}}) {
-          scaledOrder(from={{from}}, to={{to}}, orderCount={{orderCount}}, side=buy, amount={{amount}}, easing={{easing}}, varyAmount={{varyAmount}}, varyPrice={{varyPrice}});
-        }
-    </div>
+<div id="fomo-scaled-order-buy">
+FOMO Buy with a Scaled order
+{{exchange}}({{instrument}}) { scaledOrder(from={{from}}, to={{to}}, orderCount={{orderCount}}, side=buy, amount={{amount}}, easing={{easing}}, varyAmount={{varyAmount}}, varyPrice={{varyPrice}}); }
+</div>
 
     <!-- FOMO Scaled Order Sell-->
-    <div id="fomo-scaled-order-sell">
-        FOMO with a Scaled order
-        {{exchange}}({{instrument}}) {
-        scaledOrder(from={{from}}, to={{to}}, orderCount={{orderCount}}, side=sell, amount={{amount}}, easing={{easing}}, varyAmount={{varyAmount}}, varyPrice={{varyPrice}});
-        }
-    </div>
+<div id="fomo-scaled-order-sell">
+FOMO Sell with a Scaled order
+{{exchange}}({{instrument}}) { scaledOrder(from={{from}}, to={{to}}, orderCount={{orderCount}}, side=sell, amount={{amount}}, easing={{easing}}, varyAmount={{varyAmount}}, varyPrice={{varyPrice}}); }
+</div>
 
     <!-- FOMO Timed Order -->
-    <div id="fomo-timed-order-buy">
-        FOMO with a Timed order
-        {{exchange}}({{instrument}}) {
-          steppedMarketOrder(orderCount={{orderCount}}, duration={{duration}}, side=buy, amount={{amount}});
-        }
-    </div>
+<div id="fomo-timed-order-buy">
+FOMO Buy with a Timed order
+{{exchange}}({{instrument}}) { steppedMarketOrder(orderCount={{orderCount}}, duration={{duration}}, side=buy, amount={{amount}}); }
+</div>
 
-    <div id="fomo-timed-order-sell">
-        FOMO with a Timed order
-        {{exchange}}({{instrument}}) {
-        steppedMarketOrder(orderCount={{orderCount}}, duration={{duration}}, side=sell, amount={{amount}});
-        }
-    </div>
+<div id="fomo-timed-order-sell">
+FOMO Sell with a Timed order
+{{exchange}}({{instrument}}) { steppedMarketOrder(orderCount={{orderCount}}, duration={{duration}}, side=sell, amount={{amount}}); }
+</div>
 
 
     <!--
@@ -992,15 +985,15 @@ bfxmargin(BTCUSD) {
     ===============
 
     -->
-    <div id="market-maker">
-        {{exchange}}({{instrument}}) {
-            marketMakerOrder(
-                bidAmount={{bidSize}}, bidStep={{bidStep}}, bidCount={{bidCount}},
-                askAmount={{askSize}}, askStep={{askStep}}, askCount={{askCount}},
-                spread={{spread}}, autoBalance={{autoBalance}}, autoBalanceEvery={{autoBalanceEvery}}
-            );
-        }
-    </div>
+<div id="market-maker">
+Start Market Maker
+{{exchange}}({{instrument}}) { marketMakerOrder(
+    bidAmount={{bidSize}}, bidStep={{bidStep}}, bidCount={{bidCount}},
+    askAmount={{askSize}}, askStep={{askStep}}, askCount={{askCount}},
+    spread={{spread}}, autoBalance={{autoBalance}}, autoBalanceEvery={{autoBalanceEvery}}
+    );
+}
+</div>
 
 
     <!--
@@ -1010,20 +1003,10 @@ bfxmargin(BTCUSD) {
 
     -->
 
-    <!-- Deribit Balance -->
-    <div id="fomo-deribit-balance">
-        deribit(BTC-PERPETUAL) { balance() }
-    </div>
-
-    <!-- Coinbase Balance -->
-    <div id="fomo-coinbase-balance">
-        coinbase(BTC-EUR) { balance() }
-    </div>
-
-    <!-- Bitfinex Balance -->
-    <div id="fomo-bitfinex-balance">
-        bitfinex(BTCUSD) { balance() }
-    </div>
+    <!-- Balance -->
+<div id="fomo-deribit-balance">
+{{exchange}}({{instrument}}) { balance() }
+</div>
 </div>
 
 <div class="notification is-success is-hidden" style="width:400px; z-index:2; position: absolute; top:10px; left: 10px;">
@@ -1033,18 +1016,6 @@ bfxmargin(BTCUSD) {
 <script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
 <script src="jquery.mustache.js"></script>
 
-
-<!--
-
-**************************************
-**************************************
-
-Change liveEndpoint below to contain the URL of you instance of Instabot Trader
-
-**************************************
-**************************************
-
--->
 <script>
     $( document ).ready(function() {
 
@@ -1054,7 +1025,7 @@ Change liveEndpoint below to contain the URL of you instance of Instabot Trader
         // Build out the options in the exchange pickers
         const options = window.fomoConfig.exchanges.map(function(exchange, i) {
             const selected = 'selected="selected"';
-            return `<option ${ i===0 ? selected : '' } value="${exchange.value}">${exchange.name}</option>`;
+            return `<option ${ exchange.value===window.fomoConfig.default ? selected : '' } value="${exchange.value}">${exchange.name}</option>`;
         });
 
         $(".exchange-picker").html(options.join(' '));
@@ -1072,7 +1043,8 @@ Change liveEndpoint below to contain the URL of you instance of Instabot Trader
         });
 
         function sendMessage(msg) {
-            logCommand(msg);
+            const toSend = `${window.fomoConfig.prefix} ${msg}\n${window.fomoConfig.postfix}`;
+            logCommand(toSend);
             const $notify = $(".notification");
 
             if (!endpoint) {
@@ -1084,17 +1056,19 @@ Change liveEndpoint below to contain the URL of you instance of Instabot Trader
                 type: "POST",
                 url: endpoint,
                 data: {
-                    message: msg
+                    message: toSend
                 },
-                success: function() {
+                success: function(res, status) {
                     $notify.text(`Message sent: ${msg}`);
                     $notify.hide().removeClass('is-hidden is-danger').addClass('is-success');
                     $notify.slideDown().delay(2000).slideUp();
+                    console.log(res, status);
                 },
-                error: function () {
+                error: function (xhr, status, err) {
                     $notify.text(`Error sending request: ${msg}`);
                     $notify.hide().removeClass('is-hidden is-success').addClass('is-danger');
                     $notify.slideDown().delay(2000).slideUp();
+                    console.log(status, err);
                 }
             });
         }
