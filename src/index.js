@@ -35,12 +35,13 @@ const signingMethod = config.get('server.security.signingMethod').toLowerCase();
 const secret = config.get('server.security.secret');
 
 // middleware to decode the query params in the request
+app.use(bodyParser.text());
 app.use(bodyParser.urlencoded({ extended: false }));
-app.use(express.urlencoded({ extended: false }));
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     next();
 });
+
 
 // Create the exchange manager
 const manager = new ExchangeManager(allExchanges);
@@ -54,10 +55,10 @@ app.post(url, (req, res) => {
     logger.notice('HTTP POST request received...');
 
     // Get the commands from the SMS
-    const message = req.body.subject || req.body.Body || req.body.message || '';
+    const body = (typeof req.body === 'string' || req.body instanceof String) ? req.body : '';
+    const message = req.body.subject || req.body.Body || req.body.message || body || '';
     if (message === '') {
-        logger.error('Request did not include a message.\nPOST messages in a variable called subject, Body or message.');
-        logger.error(req.body);
+        logger.error('Request did not include a message.\nPOST messages in a variable called subject, Body or message (or as plain text in request body).');
         return res.sendStatus(400);
     }
 
