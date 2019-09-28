@@ -1,10 +1,7 @@
-const async = require('async');
 const uuid = require('uuid/v4');
-const log = require('../common/logger');
+const logger = require('../common/logger').logger;
 const Fregex = require('../common/functional-regex');
 const notifier = require('../notifications/notifier');
-
-const logger = log.logger;
 
 
 /**
@@ -37,7 +34,7 @@ class ExchangeManager {
      * @param credentials
      * @returns {*}
      */
-    async openExchange(name, credentials, symbol) {
+    async openExchange(name, credentials) {
         // Search the open exchanges to see if we have a match
         const exchange = this.findOpened(credentials);
 
@@ -77,6 +74,7 @@ class ExchangeManager {
     async closeExchange(exchange) {
         if (!exchange) { return; }
 
+        logger.results(`de-referencing exchange ${exchange.name}`);
         const ex = this.findOpened(exchange.credentials);
         if (!ex) { return; }
 
@@ -85,19 +83,6 @@ class ExchangeManager {
             await exchange.terminate();
             this.opened = this.opened.filter(item => item !== exchange);
         }
-    }
-
-    /**
-     * Execute a command on an exchange
-     * @param exchange
-     * @param symbol
-     * @param name
-     * @param params
-     * @param session
-     * @returns {*}
-     */
-    executeCommand(exchange, symbol, name, params, session) {
-        return exchange.executeCommand(symbol, name, params, session);
     }
 
     /**
@@ -160,37 +145,34 @@ class ExchangeManager {
      * @param commands
      * @returns {Promise<any>}
      */
-    executeCommandSequence(exchange, symbol, commands) {
-        return new Promise((resolve, reject) => {
-            // no symbol or no commands, then just do nothing
-            if (symbol === '' || commands === '') {
-                return resolve();
-            }
+    async executeCommandSequence(exchange, symbol, commands) {
+        // no symbol or no commands, then just do nothing
+        if (symbol === '' || commands === '') {
+            return;
+        }
 
-            const session = uuid();
+        const session = uuid();
 
-            logger.notice('\n================================');
-            logger.notice(`Exchange : ^C${exchange.name}`);
-            logger.notice(`Symbol   : ^C${symbol.toUpperCase()}`);
-            logger.notice(`Session  : ^C${session}`);
-            logger.notice(`Commands : ^C${commands.trim().replace(/;\s*/gm, '; ')}`);
-            logger.notice('================================\n');
+        logger.notice('\n================================');
+        logger.notice(`Exchange : ^C${exchange.name}`);
+        logger.notice(`Symbol   : ^C${symbol.toUpperCase()}`);
+        logger.notice(`Session  : ^C${session}`);
+        logger.notice(`Commands : ^C${commands.trim().replace(/;\s*/gm, '; ')}`);
+        logger.notice('================================\n');
 
+        try {
             // Break up the commands into actions, and execute them in series
             const actions = this.parseActions(commands);
-            return async.eachSeries(actions, (action, next) => {
-                this.executeCommand(exchange, symbol, action.name, action.params, session)
-                    .then(() => next())
-                    .catch((err) => {
-                        if (err instanceof Error && err.message === 'Abort Sequence') {
-                            logger.error(`${action.name} FAILED. Stopping all command execution`);
-                            return next(err);
-                        }
-                        logger.error(`${action.name} FAILED: ${err}`);
-                        return next();
-                    });
-            }, err => ((err) ? reject(err) : resolve()));
-        });
+            for (const action of actions) {
+                await exchange.executeCommand(symbol, action.name, action.params, session);
+            }
+        } catch (err) {
+            logger.error('Command sequence stopped. Waiting for background tasks to complete.');
+            logger.error(err instanceof Error ? err.message : err);
+        }
+
+        // allow background tasks to complete
+        await exchange.waitForBackgroundTasks();
     }
 
     /**
@@ -247,37 +229,55 @@ class ExchangeManager {
         logger.notice(`Message : \n^C${msg.trim()}`);
         logger.notice('================================\n');
 
-        // regex to break the message up into the bits we need
-        const all = [Promise.resolve()];
-        this.commandBlocks(msg, async (exchangeName, symbol, actions) => {
-            const exchangeCredentials = credentials.find(item => item.name === exchangeName);
-            if (exchangeCredentials) {
-                const exchange = await this.openExchange(exchangeName, exchangeCredentials, symbol);
-                if (exchange) {
-                    try {
-                        await exchange.addSymbol(symbol);
-                        all.push(this.executeCommandSequence(exchange, symbol, actions)
-                            .catch((err) => {
-                                logger.error(`Command sequence terminated - ${err}`);
-                            })
-                            .finally(() => setTimeout(() => this.closeExchange(exchange), 500)));
-                    } catch (err) {
-                        logger.error(`Error - ${err}`);
-                        setTimeout(() => this.closeExchange(exchange), 500);
-                    }
-                } else {
-                    logger.error(`Exchange '${exchangeName}' is not supported`);
-                }
-            } else {
-                logger.error(`No credentials for '${exchangeName}'. Skipping`);
-            }
-        });
-
         // Send out a notification if one was wanted...
         ExchangeManager.handleAlerts(msg);
 
-        return all;
+        // regex to break the message up into the bits we need
+        const blocks = [];
+        this.commandBlocks(msg, (exchangeName, symbol, actions) => {
+            blocks.push({
+                name: exchangeName,
+                symbol,
+                actions,
+                credentials: credentials.find(item => item.name.toLowerCase() === exchangeName),
+            });
+        });
+
+        // See if we found any
+        if (blocks.length === 0) {
+            logger.results('No automated trading commands found in message. Ignoring.');
+            return;
+        }
+
+        // map all the blocks to a promise that is executing the commands in that block
+        const allPending = blocks.map(async (item) => {
+            // no credentials...
+            if (!item.credentials) {
+                return;
+            }
+
+            // try and open the exchange
+            const exchange = await this.openExchange(item.name, item.credentials);
+            if (!exchange) {
+                logger.error(`Unable to start exchange '${item.name}'.`);
+                return;
+            }
+
+            try {
+                await exchange.addSymbol(item.symbol);
+                await this.executeCommandSequence(exchange, item.symbol, item.actions);
+            } catch (err) {
+                logger.error(`Error - ${err}`);
+            } finally {
+                // always close the exchange, with a short lag
+                setTimeout(() => this.closeExchange(exchange), 500);
+            }
+        });
+
+        // wrap all the pending promises in a single promise. Not really needed, but seems neater.
+        return Promise.all(allPending);
     }
 }
+
 
 module.exports = ExchangeManager;

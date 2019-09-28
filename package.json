@@ -23,7 +23,8 @@
     "eslint-plugin-import": "^2.7.0",
     "istanbul": "1.1.0-alpha.1",
     "mocha": "^5.2.0",
-    "sinon": "^7.2.2"
+    "sinon": "^7.2.2",
+    "nock": "^11.3.5"
   },
   "license": "MIT",
   "homepage": "https://instabot42.github.io/",

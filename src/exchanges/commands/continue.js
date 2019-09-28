@@ -1,11 +1,11 @@
 const logger = require('../../common/logger').logger;
 const conditional = require('./conditional');
-
+const AbortSequenceError = require('../../exceptions/abort_sequence');
 
 async function test(context, condition, value) {
     const result = await conditional(context, condition, value);
     if (!result) {
-        throw new Error('Abort Sequence');
+        throw new AbortSequenceError('Conditional ContinueIf test did not pass. Cancel remaining commands');
     }
 
     return true;
@@ -16,7 +16,7 @@ async function test(context, condition, value) {
  * Continue if a condition is met
  * continue(if=condition, value=v);
  */
-module.exports = (context, args) => {
+module.exports = async (context, args) => {
     const { ex = {} } = context;
 
     const p = ex.assignParams({

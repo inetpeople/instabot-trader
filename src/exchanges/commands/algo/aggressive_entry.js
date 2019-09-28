@@ -1,6 +1,91 @@
 const uuid = require('uuid/v4');
 const logger = require('../../../common/logger').logger;
 
+
+/**
+ * Fetch the current price
+ * @param context
+ * @param side
+ * @returns {Promise<number>}
+ */
+async function getCurrentPrice(context, side) {
+    const { ex = {}, symbol = '', session = '' } = context;
+    const isBuy = (side === 'buy');
+
+    // get the current price
+    const orderBook = await ex.support.ticker(context);
+    return isBuy ? parseFloat(orderBook.bid) : parseFloat(orderBook.ask);
+}
+
+
+/**
+ * Will attempt to place an order at the top of the book.
+ * If it fails, as the price moved, it will try again, though it will only try a limited number of times
+ * @param context
+ * @param side
+ * @param amount
+ * @param price
+ * @returns {Promise<*>}
+ */
+async function placeOrderAtTop(context, side, amount, price) {
+    const { ex = {}, symbol = '', session = '' } = context;
+
+    // figure out some prices for the order
+    const now = new Date().toISOString();
+    logger.info(`${amount} of Aggressive Entry Order still to fill at ${now}`);
+
+    let orderAttempts = 0;
+    let order = null;
+    let currentPrice = price;
+    while (orderAttempts < 20) {
+        // get the price...
+        logger.info(`Placing order for ${amount} at ${currentPrice}.`);
+
+        // place a new limit order
+        const orderParams = [
+            { name: 'side', value: side, index: 0 },
+            { name: 'amount', value: `${amount}`, index: 1 },
+            { name: 'offset', value: `@${currentPrice}`, index: 2 },
+            { name: 'postOnly', value: 'true', index: 3 },
+        ];
+        order = await ex.executeCommand(symbol, 'limitOrder', orderParams, session);
+
+        // Wait for the order to exist
+        let orderInfo = await ex.api.order(order.order);
+        let attempts = 0;
+        while (attempts < 10 && orderInfo === null) {
+            await ex.waitSeconds(ex.minPollingDelay);
+            orderInfo = await ex.api.order(order.order);
+            attempts += 1;
+        }
+
+        if (orderInfo !== null) {
+            if ((orderInfo.is_open) || (orderInfo.is_filled)) {
+                return { order, currentPrice };
+            }
+        }
+
+        // Going around to try and place the order again
+        orderAttempts += 1;
+        currentPrice = await getCurrentPrice(context, side);
+
+        logger.info(`Order failed (price might have moved against us too quickly). Trying again. Attempt ${orderAttempts}`);
+        logger.dim(orderInfo);
+    }
+
+    // probably not worked, or lagged to hell. return what we have.
+    return { order, currentPrice };
+}
+
+async function earlyExit(ex, activeOrder, msg) {
+    logger.progress(msg);
+    if (activeOrder) {
+        await ex.api.cancelOrders([activeOrder]);
+    }
+
+    return Promise.resolve({});
+}
+
 /**
  * Place an aggressive entry algorithmic order
  */
@@ -10,12 +95,15 @@ module.exports = async (context, args) => {
         side: 'buy',
         amount: '0',
         position: '',
+        timeLimit: '',
+        slippageLimit: '',
         tag: 'aggressive',
     }, args);
 
     // Get the params in units we can use (numbers!)
     p.side = p.side.toLowerCase();
-    p.amount = ex.roundAsset(symbol, p.amount);
+    p.timeLimit = ex.timeToSeconds(p.timeLimit, 0);
+    const expiryTime = Date.now() + (p.timeLimit * 1000);
 
     // show a little progress
     logger.progress(`AGGRESSIVE ENTRY- ${ex.name}`);
@@ -38,6 +126,10 @@ module.exports = async (context, args) => {
     const side = modifiedPosition.side;
     const amountStr = `${modifiedPosition.amount.value}${modifiedPosition.amount.units}`;
 
+    // Work out the slippage limit, if there is one
+    const slippageSide = side === 'buy' ? 'sell' : 'buy';
+    const slippagePrice = await ex.offsetToAbsolutePrice(symbol, slippageSide, p.slippageLimit);
+
     // convert the amount to an actual order size.
     const orderPrice = await ex.offsetToAbsolutePrice(symbol, side, '0');
     const details = await ex.orderSizeFromAmount(symbol, side, orderPrice, amountStr);
@@ -46,12 +138,10 @@ module.exports = async (context, args) => {
     }
 
     const id = uuid();
-    const isBuy = (side === 'buy');
-
-    logger.results(`Aggressive entry order adjusted to side: ${side}, amount: ${details.orderSize}.`);
 
     // Log the algo order, so it can be cancelled
     ex.startAlgoOrder(id, side, session, p.tag);
+    logger.results(`Aggressive entry order adjusted to side: ${side}, amount: ${details.orderSize}.`);
 
     // Start off we no active order and the full amount still to fill
     let activeOrder = null;
@@ -61,41 +151,36 @@ module.exports = async (context, args) => {
 
     // The loop until there is nothing left to order
     while (amountLeft >= ex.symbolData.minOrderSize(symbol)) {
-        // have we reached the expiry time of the order
-        if ((ex.isAlgoOrderCancelled(id))) {
-            logger.progress('aggressive entry order cancelled - stopping');
-            if (activeOrder) {
-                await ex.api.cancelOrders([activeOrder]);
-            }
+        // Has the order been cancelled via a cancelOrders call
+        if (ex.isAlgoOrderCancelled(id)) {
+            return earlyExit(ex, activeOrder, 'aggressive entry order cancelled.');
+        }
 
-            return Promise.resolve({});
+        // have we reached the expiry time of the order
+        if (p.timeLimit > 0 && expiryTime < Date.now()) {
+            return earlyExit(ex, activeOrder, 'aggressive entry order reached time limit. Aborting');
         }
 
         // get the current price
-        const orderBook = await ex.support.ticker(context);
-        const currentPrice = isBuy ? parseFloat(orderBook.bid) : parseFloat(orderBook.ask);
+        const currentPrice = await getCurrentPrice(context, side);
 
+        // Abort if too much slippage
+        if (p.slippageLimit !== '') {
+            const hasBuySlippedTooFar = (side === 'buy' && currentPrice > slippagePrice);
+            const hasSellSlippedTooFar = (side === 'sell' && currentPrice < slippagePrice);
+            if (hasBuySlippedTooFar || hasSellSlippedTooFar) {
+                return earlyExit(ex, activeOrder, 'aggressive entry order reached price slippage limit. Aborting');
+            }
+        }
+
+        // track the order
         if (activeOrder === null) {
             // are we the right side of the limit price?
-            // Figure out how big the order should be (90% to 110% of average amount)
             const amount = ex.roundAsset(symbol, amountLeft);
-
-            // figure out some prices for the order
-            const now = new Date().toISOString();
-            logger.info(`${amountLeft} of Aggressive Entry Order still to fill at ${now}`);
-            logger.info(`Placing order for ${amount} at ${currentPrice}.`);
-
-            // place a new limit order
-            const orderParams = [
-                { name: 'side', value: side, index: 0 },
-                { name: 'amount', value: `${amount}`, index: 1 },
-                { name: 'offset', value: `@${currentPrice}`, index: 2 },
-                { name: 'postOnly', value: 'true', index: 3 },
-            ];
-            const order = await ex.executeCommand(symbol, 'limitOrder', orderParams, session);
-
+            const placedOrder = await placeOrderAtTop(context, side, amount, currentPrice);
+            const order = placedOrder.order;
             activeOrder = order.order;
-            activePrice = currentPrice;
+            activePrice = placedOrder.currentPrice;
             waitTime = ex.minPollingDelay + 2;
         } else {
             // There is already an open order, so see if it's filled yet

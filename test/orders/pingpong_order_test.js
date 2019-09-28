@@ -95,7 +95,7 @@ describe('Ping Pong Orders', () => {
         await fakeTimer.tickAsync(1000, 100);
         assert.isTrue(limit.calledThrice);
         assert.equal(finished.callCount, 0);
-        assert.equal(getOrder.callCount, 1);
+        assert.equal(getOrder.callCount, 2);
 
         // Start marking the orders as filled
         getOrder.resolves({ is_filled: true, is_open: true });
@@ -155,7 +155,7 @@ describe('Ping Pong Orders', () => {
         await fakeTimer.tickAsync(1000, 100);
         assert.isTrue(limit.calledThrice);
         assert.equal(finished.callCount, 0);
-        assert.equal(getOrder.callCount, 1);
+        assert.equal(getOrder.callCount, 2);
 
         // Start marking the orders as filled
         getOrder.resolves({ is_filled: true, is_open: true });

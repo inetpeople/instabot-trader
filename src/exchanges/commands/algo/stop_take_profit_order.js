@@ -32,6 +32,7 @@ module.exports = async (context, args) => {
         { name: 'amount', value: p.amount, index: 2 },
         { name: 'postOnly', value: 'true', index: 3 },
         { name: 'reduceOnly', value: 'true', index: 4 },
+        { name: 'tag', value: p.tag, index: 5 },
     ];
     const tpOrderFull = await ex.executeCommand(symbol, 'limitOrder', tpParams, session);
     const tpOrder = tpOrderFull.order;
@@ -41,6 +42,7 @@ module.exports = async (context, args) => {
         { name: 'side', value: p.side, index: 0 },
         { name: 'offset', value: p.sl, index: 1 },
         { name: 'amount', value: p.amount, index: 2 },
+        { name: 'tag', value: p.tag, index: 3 },
     ];
     const slOrder = await ex.executeCommand(symbol, 'stopMarketOrder', slParams, session);
 
@@ -50,24 +52,26 @@ module.exports = async (context, args) => {
         // Get the status on the TP order
         const tpInfo = await ex.api.order(tpOrder);
         if ((tpInfo !== null) && ((tpInfo.is_filled) || (!tpInfo.is_open))) {
-            logger.progress('Take Profit filled / cancelled. Cancel Stop Loss');
+            logger.progress('Take Profit filled / cancelled. Cancel Stop Loss if still open (might fail)');
             await ex.api.cancelOrders([slOrder]);
-            return;
+            return true;
         }
 
         try {
             const slInfo = await ex.api.order(slOrder);
             if ((slInfo !== null) && ((slInfo.is_filled) || (!slInfo.is_open))) {
-                logger.progress('Stop Loss order filled / cancelled. Cancel Take Profit');
+                logger.progress('Stop Loss order filled / cancelled. Cancel Take Profit if still open (might fail)');
                 await ex.api.cancelOrders([tpOrder]);
-                return;
+                return true;
             }
         } catch(err) {
             await ex.api.cancelOrders([tpOrder]);
-            return;
+            return true;
         }
 
         // wait for a bit before deciding what to do next
         await ex.waitSeconds(waitTime);
     }
+
+    return true;
 };

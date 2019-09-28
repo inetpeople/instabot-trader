@@ -31,6 +31,15 @@ describe('Util lib', () => {
         assert.equal(util.round(1.5, 1), 1.5);
     });
 
+    it('can round to the nearest number to 10', () => {
+        assert.equal(util.round(1, -1), 0);
+        assert.equal(util.round(8.5, -1), 10);
+        assert.equal(util.round(42, -1), 40);
+        assert.equal(util.round(45, -1), 50);
+        assert.equal(util.roundDown(42, -1), 40);
+        assert.equal(util.roundUp(42, -1), 50);
+    });
+
     it('can round down', () => {
         assert.equal(util.roundDown(1), 1);
         assert.equal(util.roundDown(1, 1), 1);

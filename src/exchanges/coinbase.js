@@ -1,6 +1,7 @@
 const log = require('../common/logger');
 const Exchange = require('./exchange');
 const CoinbaseApi = require('../apis/coinbase');
+const NotSupported = require('./commands/not_supported');
 
 const logger = log.logger;
 
@@ -17,8 +18,17 @@ class Coinbase extends Exchange {
         super(credentials);
         this.name = 'coinbase';
 
+        this.minPollingDelay = 1;
+        this.maxPollingDelay = 10;
+
         // start up any sockets or create API handlers here.
         this.api = new CoinbaseApi(credentials.key, credentials.secret, credentials.passphrase, credentials.endpoint);
+
+        // trailing commands are not supported here yet (need updateOrderPrice in the API driver)
+        this.commands.trailingStopLossOrder = NotSupported;
+        this.commands.trailingStopLoss = NotSupported;
+        this.commands.trailingTakeProfitOrder = NotSupported;
+        this.commands.trailingTakeProfit = NotSupported;
     }
 
     /**

@@ -226,6 +226,7 @@ describe('Order Size Calculations', () => {
             total: 3.5,
             available: 2,
             isAllAvailable: true,
+            rawOrderSize: 2,
             orderSize: 2,
         };
 
@@ -256,6 +257,7 @@ describe('Order Size Calculations', () => {
             total: 3.5,
             available: 2,
             isAllAvailable: false,
+            rawOrderSize: 1,
             orderSize: 1,
         };
 
@@ -286,6 +288,7 @@ describe('Order Size Calculations', () => {
             total: 3.5,
             available: 1,
             isAllAvailable: true,
+            rawOrderSize: 2,
             orderSize: 1,
         };
 
@@ -316,6 +319,7 @@ describe('Order Size Calculations', () => {
             total: 1.5,
             available: 0,
             isAllAvailable: true,
+            rawOrderSize: 2,
             orderSize: 0,
         };
 
@@ -346,6 +350,7 @@ describe('Order Size Calculations', () => {
             total: 3.5,
             available: 2,
             isAllAvailable: false,
+            rawOrderSize: 1,
             orderSize: 1,
         };
 
@@ -376,6 +381,7 @@ describe('Order Size Calculations', () => {
             total: 3.5,
             available: 2,
             isAllAvailable: false,
+            rawOrderSize: 0.5,
             orderSize: 0.5,
         };
 
@@ -406,6 +412,7 @@ describe('Order Size Calculations', () => {
             total: 4,
             available: 2,
             isAllAvailable: false,
+            rawOrderSize: 0.4,
             orderSize: 0.4,
         };
 
@@ -436,6 +443,7 @@ describe('Order Size Calculations', () => {
             total: 4,
             available: 2,
             isAllAvailable: false,
+            rawOrderSize: 0.2,
             orderSize: 0.2,
         };
 

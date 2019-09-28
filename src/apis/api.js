@@ -119,6 +119,17 @@ class ApiInterface {
     order(orderId) {
         return Promise.reject(new Error('Not implemented'));
     }
+
+    /**
+     * Updates the price of a given order. Returns a new order id (which may be the same as the input order id,
+     * but might be different, depending on the exchange.
+     * @param orderId
+     * @param price
+     * @returns {Promise<never>}
+     */
+    updateOrderPrice(orderId, price) {
+        return Promise.reject(new Error('Not implemented'));
+    }
 }
 
 module.exports = ApiInterface;

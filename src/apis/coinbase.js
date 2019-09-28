@@ -158,6 +158,47 @@ class Coinbase extends ApiInterface {
     }
 
     /**
+     * Map the coinbase order to figure out what type of order it represents
+     * @param o
+     * @returns {string}
+     */
+    orderTypeFromOrder(o) {
+        if (o.type === 'market') {
+            return 'stop_market';
+        } else if (o.type === 'limit') {
+            return 'limit';
+        }
+
+        throw new Error('orderTypeFromOrder(): unknown order type.');
+    }
+
+    /**
+     * Update the order price and return a new order id
+     * @param order
+     * @param price
+     * @returns {Promise<*>}
+     */
+    async updateOrderPrice(order, price) {
+        // Find out about the current order
+        const o = await this.order(order);
+        logger.error(o);
+
+        // cancel it
+        await this.cancelOrders([order]);
+
+        // Figure out what kind of order we've go and update it
+        const orderType = this.orderTypeFromOrder(o);
+        let newOrder = null;
+        if (orderType === 'limit') {
+            newOrder = await this.limitOrder(o.product_id, o.size, price, o.side, o.post_only, false);
+        } else if (orderType === 'stop_market') {
+            newOrder = await this.stopOrder(o.product_id, o.size, price, o.side, '');
+        }
+
+        return newOrder;
+    }
+
+    /**
      * Get active orders
      * @param symbol
      * @param side - buy, sell or all

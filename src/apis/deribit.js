@@ -43,10 +43,6 @@ class DeribitApi extends ApiInterface {
         }, (next) => {
             // const t0 = Date.now();
             request(requestOptions, (error, response, body) => {
-                // const t1 = Date.now();
-                // const duration = (t1 - t0).toFixed(3);
-                // logger.debug(`${requestOptions.method} to ${requestOptions.url} took ${duration}ms`);
-
                 if (error) {
                     logger.error('Error calling Deribit API');
                     logger.error(error);
@@ -128,6 +124,7 @@ class DeribitApi extends ApiInterface {
         return new Promise((resolve, reject) => {
             this.callAPIWithRetries(requestOptions, 10, (err, response) => {
                 if (err) return reject(err);
+
                 return resolve(response.result);
             });
         });
@@ -164,17 +161,17 @@ class DeribitApi extends ApiInterface {
      * Makes an Auth request to the API
      * @param action
      * @param params
-     * @param methodOrderride
+     * @param methodOverride
      * @returns {*}
      */
-    makeAuthRequest(action, params, methodOrderride) {
+    makeAuthRequest(action, params, methodOverride) {
         // var headers, key, nonce, path, payload, signature, url, value
         if (!this.key || !this.secret) {
             return Promise.reject(new Error('missing api key or secret'));
         }
 
         let method = action.startsWith('/api/v1/public') ? 'GET' : 'POST';
-        method = methodOrderride || method;
+        method = methodOverride || method;
         const args = method === 'GET' ? `?${this.objectToString(params)}` : '';
 
         const url = `${this.url}${action}${args}`;
@@ -255,14 +252,14 @@ class DeribitApi extends ApiInterface {
             instrument: symbol.toUpperCase(),
             type: 'limit',
             quantity: String(util.roundDown(amount, 0)),
-            price: String(util.round(price * 2, 0) / 2),
+            price: String(price),
             time_in_force: 'good_till_cancel',
             postOnly,
             reduceOnly,
         };
 
         return this.makeAuthRequest(`/api/v1/private/${side}`, params)
-            .then(orderInfo => orderInfo.order);
+            .then(orderInfo => this.remapOrder(orderInfo.order));
     }
 
     /**
@@ -279,7 +276,7 @@ class DeribitApi extends ApiInterface {
         };
 
         return this.makeAuthRequest(`/api/v1/private/${side}`, params)
-            .then(orderInfo => orderInfo.order);
+            .then(orderInfo => this.remapOrder(orderInfo.order));
     }
 
     /**
@@ -303,7 +300,7 @@ class DeribitApi extends ApiInterface {
         };
 
         return this.makeAuthRequest(`/api/v1/private/${side}`, params)
-            .then(orderInfo => orderInfo.order);
+            .then(orderInfo => this.remapOrder(orderInfo.order));
     }
 
     /**
@@ -319,7 +316,7 @@ class DeribitApi extends ApiInterface {
         };
 
         return this.makeAuthRequest('/api/v1/private/getopenorders', params)
-            .then(orders => orders.filter(order => ((side === 'buy' || side === 'sell') ? order.direction === side : true)));
+            .then(orders => orders.filter(order => ((side === 'buy' || side === 'sell') ? order.direction === side : true)).map(o => this.remapOrder(o)));
     }
 
     /**
@@ -329,7 +326,7 @@ class DeribitApi extends ApiInterface {
      */
     cancelOrders(orders) {
         return new Promise((resolve, reject) => {
-            async.eachSeries(orders, (order, next) => this.makeAuthRequest('/api/v1/private/cancel', { orderId: order.orderId })
+            async.eachSeries(orders, (order, next) => this.makeAuthRequest('/api/v1/private/cancel', { orderId: order.id })
                 .then(() => next())
                 .catch(err => next()), (err, result) => {
                 if (err) return reject(err);
@@ -339,21 +336,60 @@ class DeribitApi extends ApiInterface {
     }
 
     /**
+     * Remaps deribits order format to the standardised format used in this app
+     * @param o
+     * @returns {{id: (number|*), side: "normal" | "reverse" | "alternate" | "alternate-reverse" | IDBCursorDirection | string, amount: string | *, remaining: number, executed: *, is_filled: boolean, is_open: boolean, type: *, price: *}}
+     */
+    remapOrder(o) {
+        return {
+            id: o.orderId,
+            side: o.direction,
+            amount: o.quantity,
+            remaining: o.quantity - o.filledQuantity,
+            executed: o.filledQuantity,
+            is_filled: o.quantity === o.filledQuantity,
+            is_open: o.state === 'open' || (o.state === 'untriggered' && o.type === 'stop_market'),
+            // below are specific to Deribit and used internally by this driver.
+            type: o.type,
+            price: o.price,
+            deribitAmount: o.amount,
+        };
+    }
+
+    /**
      * Get order info
      * @param order
      * @returns {PromiseLike<{id: *, side: *, amount: number, remaining: number, executed: number, is_filled: boolean}> | Promise<{id: *, side: *, amount: number, remaining: number, executed: number, is_filled: boolean}>}
      */
     order(order) {
-        return this.makeAuthRequest('/api/v1/private/orderstate', { orderId: order.orderId }, 'GET')
-            .then(o => ({
-                id: o.orderId,
-                side: o.direction,
-                amount: o.quantity,
-                remaining: o.quantity - o.filledQuantity,
-                executed: o.filledQuantity,
-                is_filled: o.quantity === o.filledQuantity,
-                is_open: o.state === 'open' || (o.state === 'untriggered' && o.type === 'stop_market'),
-            }));
+        return this.makeAuthRequest('/api/v1/private/orderstate', { orderId: order.id }, 'GET')
+            .then(o => (this.remapOrder(o)));
+    }
+
+    /**
+     * Update the order price and return a new order id
+     * @param order
+     * @param price
+     * @returns {Promise<*>}
+     */
+    async updateOrderPrice(order, price) {
+        const data = {
+            orderId: order.id,
+            amount: order.deribitAmount,
+        };
+
+        // Work out what values to update
+        if (order.type === 'stop_market') {
+            data.stopPx = price;
+        } else if (order.type === 'stop_limit') {
+            data.stopPx = price;
+            data.price = price;
+        } else {
+            data.price = price;
+        }
+
+        return this.makeAuthRequest('/api/v1/private/edit', data)
+            .then(orderInfo => this.remapOrder(orderInfo.order));
     }
 
     /**

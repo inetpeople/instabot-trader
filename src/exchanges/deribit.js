@@ -60,6 +60,7 @@ class Deribit extends Exchange {
                 assetPrecision: calcPrecision(symbolDetails.minTradeSize),
                 pricePrecision: symbolDetails.pricePrecision,
                 tickSize: symbolDetails.tickSize,
+                contractSize: symbolDetails.contractSize,
             });
         }
     }
@@ -80,7 +81,8 @@ class Deribit extends Exchange {
      */
     roundPrice(symbol, price) {
         const sd = this.symbolData.find(symbol);
-        return util.round(price / sd.tickSize, 0) * sd.tickSize;
+        const tick = 1 / sd.tickSize;
+        return util.round(price * tick, 0) / tick;
     }
 
     /**
@@ -91,9 +93,27 @@ class Deribit extends Exchange {
      * @param amountStr
      * @returns {Promise<{total: *, available: *, isAllAvailable: boolean, orderSize: *}>}
      */
-    orderSizeFromAmount(symbol, side, orderPrice, amountStr) {
+    async orderSizeFromAmount(symbol, side, orderPrice, amountStr) {
         // Validate we are not trying to use a % of the wallet (leverage does not really have this concept)
         const amount = this.parseQuantity(amountStr);
+
+        // % and %% supported for some symbols.
+        if ((amount.units === '%') || (amount.units === '%%')) {
+            const ticker = await this.api.ticker(symbol);
+            const sd = this.symbolData.find(symbol);
+
+            const regex = /^(.{3})-(.*)/u;
+            const m = regex.exec(symbol);
+            if (m) {
+                const account = await this.api.account(m[1]);
+                const funds = (amount.units === '%') ? account.marginBalance : account.availableFunds;
+                const price = parseFloat(side === 'buy' ? ticker.bid : ticker.ask);
+                const dollarValue = this.roundAsset(symbol, price * (amount.value / 100) * funds);
+                amount.value = this.roundAsset(symbol, dollarValue / sd.contractSize);
+                amount.units = '';
+            }
+        }
+
         if (amount.units !== '') {
             return Promise.reject(new Error('Deribit amount does not support % or units. Use just the number of contracts (eg "1")'));
         }
@@ -122,7 +142,7 @@ class Deribit extends Exchange {
         if (targetPosition === '') {
             // use the amount as an absolute change (units not support here)
             const qty = this.parseQuantity(amount);
-            return Promise.resolve({ side, amount: { value: qty.value, units: '' } });
+            return Promise.resolve({ side, amount: qty });
         }
 
         // Find current position.

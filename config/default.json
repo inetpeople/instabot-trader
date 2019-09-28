@@ -57,7 +57,7 @@
     "url": ""
   },
   "notifications": {
-    "default": [ "sms" ],
+    "default": [],
     "alertOnStartup": false
   },
   "server": {

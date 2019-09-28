@@ -1,6 +1,11 @@
+const uuid = require('uuid/v4');
 const logger = require('../common/logger').logger;
 const util = require('../common/util');
 const SymbolData = require('../common/symbol_data');
+const ExchangeCommand = require('../commands/exchange_command');
+const CommandState = require('../commands/command_state');
+const AbortSequenceError = require('../exceptions/abort_sequence');
+
 
 // Fetch the commands we support
 const icebergOrder = require('./commands/algo/iceberg_order');
@@ -13,8 +18,11 @@ const stopOrTakeProfitOrder = require('./commands/algo/stop_take_profit_order');
 
 const limitOrder = require('./commands/orders/limit_order');
 const marketOrder = require('./commands/orders/market_order');
-const stopMarketOrder = require('./commands/orders/stop_market_order');
 const cancelOrders = require('./commands/cancel_orders');
+
+const stopMarketOrder = require('../commands/stop_market');
+const trailingStopLossCommand = require('../commands/trailing_stop');
+const trailingTakeProfitCommand = require('../commands/trailing_takeprofit');
 
 const notify = require('./commands/notify');
 const balance = require('./commands/balance');
@@ -29,6 +37,15 @@ const accountBalances = require('./support/account_balances');
 
 
 /**
+ * Helper to build a class constructor wrapper
+ * @param c
+ * @returns {{class: *}}
+ */
+function addExchangeCommand(c) {
+    return { class: c };
+}
+
+/**
  * Base Exchange class
  */
 class Exchange {
@@ -41,13 +58,16 @@ class Exchange {
         this.credentials = credentials;
         this.refCount = 1;
 
-        this.minPollingDelay = 1;
-        this.maxPollingDelay = 20;
+        this.minPollingDelay = 0;
+        this.maxPollingDelay = 5;
 
         this.sessionOrders = [];
         this.algorithicOrders = [];
         this.symbolData = new SymbolData();
         this.api = null;
+
+        this.backgroundTasks = [];
+        this.isAlreadyWaiting = false;
 
         this.support = {
             scaledOrderSize,
@@ -58,22 +78,39 @@ class Exchange {
         this.commands = {
             // Algorithmic Orders
             aggressiveEntryOrder,
+            aggressiveEntry: aggressiveEntryOrder,
             stopOrTakeProfitOrder,
+            stopOrTakeProfit: stopOrTakeProfitOrder,
             icebergOrder,
+            iceberg: icebergOrder,
             scaledOrder,
+            scaled: scaledOrder,
             twapOrder,
+            twap: twapOrder,
             pingPongOrder,
+            pingPong: pingPongOrder,
             marketMakerOrder,
+            marketMaker: marketMakerOrder,
+            trailingStopLossOrder: addExchangeCommand(trailingStopLossCommand),
+            trailingStopLoss: addExchangeCommand(trailingStopLossCommand),
+            trailingTakeProfitOrder: addExchangeCommand(trailingTakeProfitCommand),
+            trailingTakeProfit: addExchangeCommand(trailingTakeProfitCommand),
+
+            // deprecated
             steppedMarketOrder: twapOrder, // duplicate using legacy name
             accDisOrder: icebergOrder, // duplicate for common names
 
             // Regular orders
             limitOrder,
+            limit: limitOrder,
             marketOrder,
-            stopMarketOrder,
+            market: marketOrder,
+            stopMarketOrder: addExchangeCommand(stopMarketOrder),
+            stopMarket: addExchangeCommand(stopMarketOrder),
 
             // Other commands
             cancelOrders,
+            cancel: cancelOrders,
             wait,
             notify,
             balance,
@@ -82,11 +119,20 @@ class Exchange {
         };
 
         this.commandWhiteList = [
-            'continue', 'stop', 'stopOrTakeProfitOrder', 'aggressiveEntryOrder',
+            'trailingStopLoss', 'trailingTakeProfit',
+            'stopOrTakeProfit', 'aggressiveEntry',
+            'iceberg', 'scaled', 'twap', 'pingPong', 'marketMaker',
+            'limit', 'market', 'stopMarket',
+            'cancel',
+
+            'trailingStopLossOrder', 'trailingTakeProfitOrder',
+            'stopOrTakeProfitOrder', 'aggressiveEntryOrder',
             'icebergOrder', 'scaledOrder', 'twapOrder', 'pingPongOrder', 'marketMakerOrder',
-            'steppedMarketOrder', 'accDisOrder',
             'limitOrder', 'marketOrder', 'stopMarketOrder',
-            'cancelOrders', 'wait', 'notify', 'balance'];
+            'cancelOrders',
+            'steppedMarketOrder', 'accDisOrder',
+            'continue', 'stop', 'wait', 'notify', 'balance',
+        ];
     }
 
     /**
@@ -168,6 +214,27 @@ class Exchange {
             tag,
             order,
         });
+    }
+
+    /**
+     * Removes an order from the session
+     * @param session
+     * @param order
+     */
+    removeFromSession(session, order) {
+        this.sessionOrders = this.sessionOrders.filter(entry => entry.order !== order);
+    }
+
+    /**
+     * Updates an order in the session. Allows for the order id to have changed too.
+     * @param session
+     * @param oldOrder
+     * @param newOrder
+     * @param tag
+     */
+    updateInSession(session, tag, oldOrder, newOrder) {
+        this.removeFromSession(session, oldOrder);
+        this.addToSession(session, tag, newOrder);
     }
 
     /**
@@ -281,7 +348,6 @@ class Exchange {
         }
 
         // Does not look like a valid quantity, so treat it as zero, as that is safest
-        logger.error(`Invalid offset of ${qty}. Treating as offset of 0`);
         return { value: 0, units: '' };
     }
 
@@ -327,16 +393,41 @@ class Exchange {
      * name - name of the command to execute
      * params - an array of arguments to pass the command
      */
-    executeCommand(symbol, name, params, session) {
-        // Look up the command, ignoring case
-        const toExecute = this.commandWhiteList.find(el => (el.toLowerCase() === name.toLowerCase()));
-        if ((!toExecute) || (typeof this.commands[toExecute] !== 'function')) {
-            logger.error(`Unknown command: ${name}`);
-            return Promise.reject('unknown command');
-        }
+    async executeCommand(symbol, name, params, session) {
+        try {
+            // Look up the command, ignoring case
+            const toExecute = this.commandWhiteList.find(el => (el.toLowerCase() === name.toLowerCase()));
+            if (!toExecute) {
+                logger.error(`Unknown command: ${name}`);
+                throw new Error('Unknown Command');
+            }
 
-        // Call the function
-        return this.commands[toExecute]({ ex: this, symbol, session }, params);
+            // The command is in the whitelist, so try and build and execute it
+            const command = this.commands[toExecute];
+            const context = { ex: this, symbol, session };
+            let result = null;
+            if (typeof command === 'object') {
+                // new ExchangeCommand
+                const CommandClass = command.class;
+                const task = new CommandClass(context);
+                if (task instanceof ExchangeCommand) {
+                    await task.setup(params);
+                    result = await this.addTask(task);
+                }
+            } else if (typeof command === 'function') {
+                // Older function command
+                result = await command(context, params);
+            }
+
+            return result;
+        } catch (err) {
+            if (err instanceof AbortSequenceError) {
+                logger.error(`${name} FAILED. Stopping all command execution`);
+                throw err;
+            }
+
+            logger.error(`${name} FAILED: ${err}`);
+        }
     }
 
     /**
@@ -459,6 +550,9 @@ class Exchange {
         if (amount.units === '%%') orderSize = available * (amount.value / 100);
         if (amount.units.toLowerCase() === asset.currency) orderSize = amount.value / price;
 
+        // remember the order size before we cap and reduce it
+        const rawOrderSize = orderSize;
+
         // make sure it's no more than what we have available.
         orderSize = orderSize > available ? available : orderSize;
 
@@ -473,6 +567,7 @@ class Exchange {
             total,
             available,
             isAllAvailable: (orderSize === available),
+            rawOrderSize,
             orderSize: this.roundAsset(symbol, orderSize),
         };
     }
@@ -504,6 +599,15 @@ class Exchange {
         const currentPrice = parseFloat(orderbook.ask);
         const finalOffset = offset.units === '%' ? currentPrice * (offset.value / 100) : offset.value;
         return this.roundPrice(symbol, currentPrice + finalOffset);
+    }
+
+    /**
+     * Gets the current ticker info
+     * @param symbol
+     * @returns {Promise<*>}
+     */
+    async ticker(symbol) {
+        return this.support.ticker({ ex: this, symbol });
     }
 
     /**
@@ -585,6 +689,105 @@ class Exchange {
             const waitFor = delay < 1 ? 50 : delay * 1000;
             setTimeout(() => resolve({}), waitFor);
         });
+    }
+
+    /**
+     * Adds a task for processing
+     * @param task
+     * @returns {Promise<void>}
+     */
+    async addTask(task) {
+        // ignore things we can't process
+        if (!(task instanceof ExchangeCommand)) {
+            return {};
+        }
+
+        // execute the command
+        const state = await task.execute();
+        if (state === CommandState.finished) {
+            return task.results();
+        }
+
+        // wanted more, so push it onto the background processing list
+        this.startAlgoOrder(task.id, task.hasArg('side') ? task.args.side : 'buy', task.session, task.args.tag);
+        this.backgroundTasks.push({ task, state: await task.maybeRunToCompletion(state) });
+
+        return task.results();
+    }
+
+    /**
+     * Waits for background tasks to complete (if ever)
+     * @returns {Promise<void>}
+     */
+    async waitForBackgroundTasks() {
+        // probably another instance already waiting
+        if (this.isAlreadyWaiting) {
+            logger.info('Another process already waiting for background tasks - leave them to it.');
+            return;
+        }
+
+        try {
+            // note that we are waiting now...
+            this.isAlreadyWaiting = true;
+
+            // Clean out any tasks that are already done
+            this.backgroundTasks = this.backgroundTasks.filter(item => item.state !== CommandState.finished);
+
+            // Background task loop
+            let waitTime = this.minPollingDelay;
+            while (this.backgroundTasks.length > 0) {
+                // wait a while
+                await this.waitSeconds(waitTime);
+
+                // do a pass of the background tasks
+                waitTime = await this.backgroundTasksSinglePass((waitTime >= this.maxPollingDelay) ? this.maxPollingDelay : waitTime + 1);
+
+                // remove any tasks that are finished
+                this.backgroundTasks = this.backgroundTasks.filter(item => item.state !== CommandState.finished);
+            }
+
+            // note that we are done waiting now...
+            this.isAlreadyWaiting = false;
+        } catch (err) {
+            // note that we are done waiting now...
+            this.isAlreadyWaiting = false;
+            throw err;
+        }
+    }
+
+    /**
+     * Run a single pass through the background tasks.
+     * @param waitTime
+     * @returns {Promise<*>}
+     */
+    async backgroundTasksSinglePass(waitTime) {
+        let updateWait = waitTime;
+
+        // give all the task some time to work
+        for (const item of this.backgroundTasks) {
+            if (this.isAlgoOrderCancelled(item.task.id)) {
+                await item.task.onCancelled();
+                item.state = CommandState.finished;
+            } else {
+                // poll the background task
+                const state = await item.task.backgroundExecute();
+
+                // drop the polling back to min if anyone wants another fast poll
+                if (state === CommandState.keepGoing) {
+                    updateWait = this.minPollingDelay;
+                }
+
+                // update the state in the task list
+                item.state = state;
+            }
+
+            // If the command has finished, remove it from the algo order list
+            if (item.state === CommandState.finished) {
+                this.endAlgoOrder(item.task.id);
+            }
+        }
+
+        return updateWait;
     }
 }
 

@@ -1,8 +1,8 @@
 const assert = require('chai').assert;
 const sinon = require('sinon');
 const Exchange = require('../../src/exchanges/exchange');
-const stopOrder = require('../../src/exchanges/commands/orders/stop_market_order');
-
+const StopOrderCommand = require('../../src/commands/stop_market');
+const logger = require('../../src/common/logger').logger;
 
 class MockAPI {
     ticker() {}
@@ -44,7 +44,13 @@ describe('Stop Orders', async () => {
             { name: 'offset', value: '100', index: 1 },
             { name: 'amount', value: '1', index: 1 },
         ];
-        const order = await stopOrder({ ex: exchange, symbol: 'BTCUSD', session: 'test-session' }, args);
+
+        const stopOrder = new StopOrderCommand({ ex: exchange, symbol: 'BTCUSD', session: 'test-session' });
+        await stopOrder.setup(args);
+        await stopOrder.execute();
+
+        const order = await stopOrder.results();
+
         assert.deepEqual(order, { id: 1 });
         assert.isTrue(stop.calledWith('BTCUSD', 1, 3150, 'buy', 'mark'));
     });
@@ -57,9 +63,16 @@ describe('Stop Orders', async () => {
             { name: 'amount', value: '1', index: 1 },
             { name: 'trigger', value: 'fish ', index: 1 },
         ];
-        const order = await stopOrder({ ex: exchange, symbol: 'BTCUSD', session: 'test-session' }, args);
+
+        const stopOrder = new StopOrderCommand({ ex: exchange, symbol: 'BTCUSD', session: 'test-session' });
+        await stopOrder.setup(args);
+        await stopOrder.execute();
+
+        const order = await stopOrder.results();
+        const expected = ['BTCUSD', 1, 3150, 'buy', 'last'];
+
         assert.deepEqual(order, { id: 1 });
-        assert.isTrue(stop.calledWith('BTCUSD', 1, 3150, 'buy', 'mark'));
+        assert.deepEqual(stop.args[0], expected);
     });
 
     it('can link to index price', async () => {
@@ -69,9 +82,16 @@ describe('Stop Orders', async () => {
             { name: 'amount', value: '1', index: 1 },
             { name: 'trigger', value: 'index', index: 1 },
         ];
-        const order = await stopOrder({ ex: exchange, symbol: 'BTCUSD', session: 'test-session' }, args);
+
+        const stopOrder = new StopOrderCommand({ ex: exchange, symbol: 'BTCUSD', session: 'test-session' });
+        await stopOrder.setup(args);
+        await stopOrder.execute();
+
+        const order = await stopOrder.results();
+        const expected = ['BTCUSD', 1, 3150, 'buy', 'index'];
+
         assert.deepEqual(order, { id: 1 });
-        assert.isTrue(stop.calledWith('BTCUSD', 1, 3150, 'buy', 'index'));
+        assert.deepEqual(stop.args[0], expected);
     });
 
     it('can ignore zero sized orders', async () => {
@@ -82,7 +102,12 @@ describe('Stop Orders', async () => {
                 { name: 'amount', value: '0', index: 1 },
                 { name: 'trigger', value: 'index', index: 1 },
             ];
-            await stopOrder({ ex: exchange, symbol: 'BTCUSD', session: 'test-session' }, args);
+
+            const stopOrder = new StopOrderCommand({ ex: exchange, symbol: 'BTCUSD', session: 'test-session' });
+            await stopOrder.setup(args);
+            await stopOrder.execute();
+            await stopOrder.results();
+
             assert.isTrue(false, 'should not get here');
         } catch (err) {
             assert.isTrue(stop.notCalled);

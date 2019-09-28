@@ -20,7 +20,7 @@ module.exports = (context) => {
 
         // Default to btc / usd - not sure about this...
         // should really just throw an error
-        return 'btc';
+        return 'BTC';
     };
 
     const { ex = {}, symbol = '' } = context;

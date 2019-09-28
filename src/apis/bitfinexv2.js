@@ -99,10 +99,6 @@ class BitfinexApiv2 extends ApiInterface {
         //     logger.debug(m);
         // });
 
-        ws.on('error', (err) => {
-            logger.error('Error detected on socket connection');
-            logger.error(err);
-        });
 
         ws.on('open', () => {
             const now = new Date();
@@ -156,8 +152,26 @@ class BitfinexApiv2 extends ApiInterface {
         });
 
         // Open the socket and resolve when we are authed
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
+            let isStarting = true;
+            ws.on('error', (err) => {
+                logger.error('Error detected on socket connection');
+                if (err instanceof Error) {
+                    logger.error(`${err.name} : ${err.message}`);
+                } else {
+                    logger.error(err);
+                }
+
+                if (isStarting) {
+                    isStarting = false;
+                    reject(err);
+                }
+            });
+
             ws.once('auth', () => {
+                // started ok
+                isStarting = false;
+
                 // give it a little bit of time to settle.
                 setTimeout(() => { resolve(); }, 1000);
             });
@@ -281,6 +295,7 @@ class BitfinexApiv2 extends ApiInterface {
                 is_execited: isExecuted,
                 is_open: !isClosed,
                 last_updated: order.mtsUpdate === null ? Date.now() : order.mtsUpdate,
+                bfxOrder: order,
             };
         });
     }
@@ -482,6 +497,24 @@ class BitfinexApiv2 extends ApiInterface {
      */
     async stopOrder(symbol, amount, price, side, _trigger) {
         return this.newOrder(symbol, amount, price, side, this.isMargin ? Order.type.STOP : Order.type.EXCHANGE_STOP, false, this.isMargin);
+    }
+
+    /**
+     * Update the order price and return a new order
+     * @param order
+     * @param price
+     * @returns {Promise<*>}
+     */
+    async updateOrderPrice(order, price) {
+        if (!order) {
+            return order;
+        }
+
+        // Build new order model
+        const o = new Order(order.bfxOrder, this.ws);
+        const updated = await o.update({ price });
+
+        return this.onOrderUpdate(updated);
     }
 
     /**
